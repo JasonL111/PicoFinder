@@ -92,7 +92,7 @@ private fun FinderApp(ui: FinderUiState, vm: DeviceViewModel, onStart: () -> Uni
     val context = LocalContext.current
     BackHandler(page != Page.LIST) { page = if (page == Page.SETTINGS) Page.FIND else Page.LIST }
     Scaffold { padding ->
-        LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp),
+        LazyColumn(Modifier.fillMaxSize().padding(padding).imePadding().padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp), contentPadding = PaddingValues(bottom = 32.dp)) {
             item {
                 Row(Modifier.fillMaxWidth().padding(top = 16.dp), verticalAlignment = Alignment.CenterVertically) {

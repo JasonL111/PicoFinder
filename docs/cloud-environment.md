@@ -36,6 +36,8 @@ downloads.gradle.org、repo.maven.apache.org、plugins.gradle.org 和 PyPI 等�
 www.raspberrypi.com 受到环境出站策略限制；MicroPython API 和板型行为已改用可访问的
 **官方 GitHub v1.27.0 源码**核对，没有绕过出站策略。若要在 Cloud 下载 UF2 或直接阅读
 这些网页，需要在环境设置中加入对应域名。用户本地电脑可使用文档中的官方链接。
+GitHub API (`api.github.com`) 同样被禁止，因此 gh 无法创建 PR 或查询远端 Actions；
+原生 Git 的 HTTPS 代理已实际验证可读、可提交推送，不需要另行请求 GitHub token。
 
 可选 UI 测试：已有的 AVD `finder-api31`、API31 AOSP x86_64 image 和 emulator 位于
 `/workspace/tools`。无 KVM 时可使用软件模拟，首次启动较慢；运行：
@@ -49,6 +51,9 @@ export ANDROID_AVD_HOME=/workspace/tools/avd
 cd /workspace/PicoFinder/android
 ./gradlew :app:connectedDebugAndroidTest
 ```
+
+本 host 没有 KVM；初次软件启动与安装曾发生 ANR / 超时。最终通过非流式安装、
+运行时预编译执行了两项完整 UI 用例，具体步骤和原始结果见 [testing.md](testing.md)。
 
 这些进程不会随快照恢复而继续运行。只有需要 UI 测试时再启动模拟器；正常编辑、单元
 测试和 APK 构建不依赖它。真实 Pico / 手机仍需在物理连接它们的电脑上部署和验收。

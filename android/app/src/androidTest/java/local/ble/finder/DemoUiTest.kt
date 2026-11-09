@@ -12,9 +12,9 @@ class DemoUiTest {
     @get:Rule val rule = createAndroidComposeRule<MainActivity>()
 
     @Test fun demoDiscoveryRenameAndStopHideDistance() {
+        val vm = rule.runOnIdle { ViewModelProvider(rule.activity)[DeviceViewModel::class.java] }
         rule.onNode(isToggleable()).performClick()
         rule.onNodeWithText("开始扫描").performClick()
-        val vm = rule.runOnIdle { ViewModelProvider(rule.activity)[DeviceViewModel::class.java] }
         rule.waitUntil(10000) { vm.ui.value.devices.any { it.deviceId == 0x12345678L } }
         rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("标签 12345678"))
         rule.onNodeWithText("标签 12345678").performClick()

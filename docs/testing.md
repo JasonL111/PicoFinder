@@ -11,7 +11,7 @@
 | Android lintDebug | **通过，0 问题** | warningsAsErrors=true；未使用 baseline 隐藏问题 |
 | APK 签名与 manifest | **通过** | v2 debug 签名有效；min31 / target36；无 INTERNET / 后台位置权限 |
 | Cloud setup 刷新 | **通过** | tools/cloud_setup.py 实际运行，复用工具/缓存后再次验证构建与测试 |
-| Compose instrumentation | 结果待本轮模拟器执行完成后更新 | 真 MainActivity + Debug Fake Scanner；不测试射频 |
+| Compose instrumentation | **2 通过，0 失败/跳过** | API31 AOSP 软件模拟器，真 MainActivity + Debug Fake Scanner；不测试射频 |
 | 真实 Pico 2 W UF2 / 上传 / 冷启动 | **未运行** | 当前无连接的 USB Pico |
 | 真实 Android 权限 / BLE 接收 / 距离 | **未运行** | 当前无连接的物理手机 |
 | GitHub Actions 远端运行 | 以仓库实际 run 为准 | 不能用本地构建代替远端状态 |
@@ -25,11 +25,41 @@ Debug APK 常规位置：`android/app/build/outputs/apk/debug/app-debug.apk`。
 - `android/core/build/test-results/test/`、`core/build/reports/tests/test/`。
 - `android/app/build/test-results/testDebugUnitTest/`、`app/build/reports/tests/testDebugUnitTest/`。
 - `android/app/build/reports/lint-results-debug.html`。
-- 设备测试：`android/app/build/reports/androidTests/connected/debug/`。
+- 本次成功的设备测试原始结果：`/workspace/artifacts/compose-ui-tests.txt`（`OK (2 tests)`）。
+- Gradle 设备报告 `android/app/build/reports/androidTests/connected/debug/` 保留初次安装失败的零测试记录，**不是成功结果**。
 
 首次 lint 暴露的 API31 接收器兼容、备份规则、图标与 KTX 问题已修正；移动资源目录后
 清理了 app 生成缓存并重新构建，最终 lint 通过。软件测试包含假 BLE，不代表 MicroPython
 二进制、USB 或真实无线堆栈已经执行。模拟模式也不代表真实权限请求通过。
+
+## 模拟器执行经过与可复现步骤
+
+主机实际检查无 `/dev/kvm`，使用 `-accel off` 的 Android 12 / API31 AOSP x86_64。
+初次 Gradle UTP 安装在系统启动/分包写入时失败，运行 **0 测试**；首次直接 runner
+2 项中 1 项通过，另一项遇到 System UI ANR / Compose 空闲超时，单项重试又遇到
+输入焦点超时。这些都没有算通过。
+
+等系统启动就绪、清理系统无响应弹窗后，改用非流式安装，预编译同一 App / test APK。
+测试代码将仅用于观察数据的 ViewModel 引用在扫描前取得，减少持续更新时不必要的空闲
+等待；断言完整保留。设置页加入 IME 避让，保证键盘显示时可滚动到保存按钮。最终完整
+两项直接 runner 用例执行 **143.456 秒，OK (2 tests)**，原始输出另存 artifact。
+
+```bash
+# 已启动并解锁 API31+ 模拟器；先构建最终 App 和 test APK
+cd android
+./gradlew :app:assembleDebug :app:assembleDebugAndroidTest
+adb install --no-streaming -r -t app/build/outputs/apk/debug/app-debug.apk
+adb install --no-streaming -r -t app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+# 软件模拟器可选的 Android 官方运行时预编译；不修改 APK 或断言
+adb shell cmd package compile -m speed -f local.ble.finder
+adb shell cmd package compile -m speed -f local.ble.finder.test
+adb shell am instrument -w -r local.ble.finder.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+必须看 runner 的 `OK (2 tests)` 和失败计数；`adb shell am instrument` 自身退出码 0
+并不等于用例全通过。优先在硬件加速模拟器上使用正常的 `connectedDebugAndroidTest`。
+这些结果验证导航、模拟发现、重命名、停止后隐藏距离、后台生命周期；不验证射频、
+Android 真实权限授予或物理测距。
 
 ## 人工实机验收清单
 
