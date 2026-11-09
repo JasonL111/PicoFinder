@@ -73,10 +73,7 @@ jobs:
         env:
           APK_VERSION_NAME: ${{ needs.metadata.outputs.version_name }}
           APK_VERSION_CODE: ${{ needs.metadata.outputs.version_code }}
-        run: >-
-          ./gradlew --no-daemon
-          "-PfinderVersionName=$APK_VERSION_NAME" "-PfinderVersionCode=$APK_VERSION_CODE"
-          :core:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest
+        run: bash ../.github/scripts/build-android.sh
       - name: Verify signature and package downloadable APK
         run: |
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose android/app/build/outputs/apk/debug/app-debug.apk
@@ -94,6 +91,7 @@ jobs:
           path: |
             android/core/build/reports/tests/
             android/app/build/reports/
+            ${{ runner.temp }}/android-build.log
 
   publish:
     needs: [metadata, firmware-protocol, android]
