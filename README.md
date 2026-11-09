@@ -1,5 +1,7 @@
 # Local BLE Finder V1
 
+**手机直接安装：[下载最新测试 APK](https://github.com/JasonL111/PicoFinder/releases/download/dev-latest/local-ble-finder.apk) · [发布页与校验文件](https://github.com/JasonL111/PicoFinder/releases/tag/dev-latest)。无需 Android Studio 或自己编译。**
+
 一个完全本地运行的 DIY BLE 标签查找器：**Pico 2 W + 官方 MicroPython** 持续广播，
 **Android 12+ / Kotlin / Compose / Material 3** 按 RSSI 展示粗略距离与变化趋势。
 没有 Wi-Fi 连接、云端账号、服务器、GPS、地图、配对或 Google Find Hub 接入。
@@ -22,7 +24,7 @@ flowchart LR
 ## 快速上手
 
 硬件：Raspberry Pi **Pico 2 W**（不是 Pico / Pico W / Pico 2）、USB **数据线**、
-Android 12 / API 31 以上且支持 BLE 的手机，以及一台可运行 Android Studio 的电脑。
+Android 12 / API 31 以上且支持 BLE 的手机，以及一台用于刷写固件的电脑。
 Pico 由 USB 持续供电；不需要电池、蜂鸣器或其他模块。
 
 1. 按住 Pico 2 W 的 **BOOTSEL** 再接 USB，出现 `RP2350` 启动盘后松开。
@@ -33,17 +35,11 @@ Pico 由 USB 持续供电；不需要电池、蜂鸣器或其他模块。
    或安装 `python -m pip install mpremote==1.27.0`。
 4. 参照 [Pico 部署说明](firmware/pico2w/README.md)上传四个 `.py` 文件到设备根目录。
    `main.py` 上电自动运行；默认 300 ms 广播、-59 dBm 参考、未知电量。
-5. Android Studio 打开 **android/**，安装 SDK 36，使用 JDK 21，等待 Gradle 同步。
-   命令行构建：
-
-   ```bash
-   cd android
-   ./gradlew :core:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug
-   adb install -r app/build/outputs/apk/debug/app-debug.apk
-   ```
-
-   Windows 使用 `gradlew.bat`。包名是 `local.ble.finder`；修改方式见
-   [Android README](android/README.md)。CI 也会上传 `local-ble-finder-debug` APK artifact。
+5. 在手机打开上方“下载最新测试 APK”，下载 `local-ble-finder.apk` 并安装。
+   系统询问时，允许浏览器/文件管理器安装此来源的应用。APK 由 GitHub Actions 在测试、
+   lint 和构建通过后自动发布；不需要你安装 Android Studio、JDK 或自行编译。
+   这是 Debug 测试版；每次构建的签名可能不同，覆盖安装失败时需卸载旧版后重装，
+   卸载会清除名称和校准，请先记录参数。完整流程见 [自动交付说明](docs/delivery.md)。
 6. 手机开启蓝牙和系统位置开关，打开 App，**关闭“调试演示”**，点击“开始扫描”。
    授予“附近设备”和“精确位置”权限。未授权、蓝牙关闭或扫描失败均有中文说明。
 7. 列表中选择与 USB 日志 `ID=XXXXXXXX` 相同的标签，进入查找。逐渐靠近 / 远离，
@@ -52,7 +48,7 @@ Pico 由 USB 持续供电；不需要电池、蜂鸣器或其他模块。
    保持固定姿态、无金属或人体遮挡，开始扫描后点击“1 米校准”，等待 8 秒。
    有效样本至少 12 个且跨度至少 6 秒，波动过大不会覆盖原值。n 默认 2.2，可调 1..6。
 
-首次下载工具和依赖需要电脑联网，**App 和标签运行不需要互联网**。
+下载 APK、固件和刷写工具需要联网，**App 和标签运行不需要互联网**。
 Debug APK 只用于开发，勿用于正式签名发布；不要将本机签名密钥提交到 Git。
 
 ## 功能与运行规则
@@ -84,8 +80,12 @@ Debug APK 只用于开发，勿用于正式签名发布；不要将本机签名�
 | [android/core](android/core) | 无 Android 依赖的协议、测距、校准、设备状态及测试 |
 | [android/app](android/app) | 原生扫描、持久化、ViewModel、三个中文页面、Debug Fake |
 | [tests/protocol](tests/protocol) | CPython 编码、配置、身份与模拟 BLE API 测试 |
-| [.github/workflows/ci.yml](.github/workflows/ci.yml) | Python、Kotlin、lint、Debug APK、构建报告 |
+| [.github/workflows/ci.yml](.github/workflows/ci.yml) | CI + CD：校验、构建、自动发布 APK 到 Releases |
+| [docs/delivery.md](docs/delivery.md) | 无需本地编译的安装、发布渠道与下载说明 |
 | [firmware/esp32c3/README.md](firmware/esp32c3/README.md) | ESP-IDF + NimBLE 迁移约束；无 ESP 固件 |
+
+用户直接下载 APK；以下命令仅供开发者修改代码后验证。Android Studio 打开 `android/`，
+包名 `local.ble.finder` 的修改方式及工具链见 [Android README](android/README.md)。
 
 ```bash
 # 仓库根目录，无第三方 Python 测试依赖

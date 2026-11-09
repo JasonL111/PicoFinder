@@ -1,5 +1,8 @@
 # Android 开发与运行
 
+只想使用 App：直接[下载自动构建测试 APK](https://github.com/JasonL111/PicoFinder/releases/download/dev-latest/local-ble-finder.apk)，
+不需要执行本页构建命令。发布流程和签名限制见 [自动交付说明](../docs/delivery.md)。
+
 工具链固定在 version catalog：AGP 8.13.2、Gradle 8.13（Wrapper + SHA-256）、Kotlin
 2.2.21 + 同版本 Compose compiler plugin、Compose BOM 2025.12.01、JDK 21、SDK / target
 36、Build Tools 36.0.0、minSdk 31。编译字节码目标 Java 17。使用支持 AGP 8.13 的当前
@@ -58,5 +61,7 @@ instrumentation 测试使用真正的 MainActivity + Fake Scanner 检查页面�
 
 APK：`app/build/outputs/apk/debug/app-debug.apk`；单元测试报告：
 `core/build/reports/tests/test/` 与 `app/build/reports/tests/testDebugUnitTest/`；
-lint：`app/build/reports/lint-results-debug.html`。CI 上传 APK 和报告。
+lint：`app/build/reports/lint-results-debug.html`。CI 上传 APK 和报告；main / 版本 tag 验证
+通过后，CD 会发布可直接安装的 Debug APK、SHA256SUMS 和 build-info.json 到 GitHub Releases。
+流水线通过 finderVersionName / finderVersionCode Gradle 属性写入版本，本地默认仍为 1.0.0 / 1。
 release 可通过 `./gradlew :app:assembleRelease` 构建未签名包；V1 不配置发布密钥。
