@@ -1,0 +1,71 @@
+{
+  "service_uuid": "26a8a030-0a21-4e62-a373-9d127b7ce808",
+  "uuid_le_hex": "08e87c7b129d73a3624e210a30a0a826",
+  "valid": [
+    {
+      "name": "unknown_battery",
+      "device_id": 305419896,
+      "rssi_at_1m": -59,
+      "battery_level": null,
+      "flags": 0,
+      "service_data_hex": "017856341200c5ff",
+      "advertisement_hex": "020104192108e87c7b129d73a3624e210a30a0a826017856341200c5ff"
+    },
+    {
+      "name": "max_unsigned_id",
+      "device_id": 4294967295,
+      "rssi_at_1m": -100,
+      "battery_level": 100,
+      "flags": 0,
+      "service_data_hex": "01ffffffff009c64",
+      "advertisement_hex": "020104192108e87c7b129d73a3624e210a30a0a82601ffffffff009c64"
+    },
+    {
+      "name": "minimum_id",
+      "device_id": 1,
+      "rssi_at_1m": -20,
+      "battery_level": 0,
+      "flags": 0,
+      "service_data_hex": "010100000000ec00",
+      "advertisement_hex": "020104192108e87c7b129d73a3624e210a30a0a826010100000000ec00"
+    }
+  ],
+  "invalid": [
+    {
+      "name": "truncated_ad",
+      "advertisement_hex": "020104192108e87c7b129d73a3624e210a30a0a826017856341200c5"
+    },
+    {
+      "name": "wrong_uuid",
+      "advertisement_hex": "020104192109e87c7b129d73a3624e210a30a0a826017856341200c5ff"
+    },
+    {
+      "name": "unsupported_version",
+      "advertisement_hex": "020104192108e87c7b129d73a3624e210a30a0a826027856341200c5ff"
+    },
+    {
+      "name": "zero_device_id",
+      "advertisement_hex": "020104192108e87c7b129d73a3624e210a30a0a826010000000000c5ff"
+    },
+    {
+      "name": "invalid_rssi_reference",
+      "advertisement_hex": "020104192108e87c7b129d73a3624e210a30a0a82601785634120000ff"
+    },
+    {
+      "name": "invalid_battery",
+      "advertisement_hex": "020104192108e87c7b129d73a3624e210a30a0a826017856341200c565"
+    },
+    {
+      "name": "zero_length_service",
+      "advertisement_hex": "0121"
+    },
+    {
+      "name": "missing_service",
+      "advertisement_hex": "020104"
+    },
+    {
+      "name": "v1_extra_byte",
+      "advertisement_hex": "0201041a2108e87c7b129d73a3624e210a30a0a826017856341200c5ff00"
+    }
+  ]
+}

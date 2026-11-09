@@ -1,0 +1,18 @@
+# Android / IDE
+.gradle/
+.kotlin/
+**/build/
+local.properties
+.idea/
+*.iml
+*.jks
+*.keystore
+# Python / local device state
+__pycache__/
+*.py[cod]
+.venv/
+firmware/pico2w/device_id.txt*
+# Local setup and logs
+.env
+*.log
+.DS_Store
