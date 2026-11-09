@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<lint>
+    <!-- SDK 36 is the pinned, tested V1 compatibility baseline. This check fetches
+         moving "latest SDK" metadata on networked runners; it is upgrade advice,
+         rather than an API compatibility error. Keep it visible without turning
+         a new platform announcement into a failure of an unchanged test APK.
+         ExpiredTargetSdkVersion, NewApi and all other checks retain their severities. -->
+    <issue id="OldTargetApi" severity="informational" />
+</lint>

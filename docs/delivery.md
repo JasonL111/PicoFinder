@@ -68,3 +68,7 @@ git push origin v1.0.0
 此前 CI 的失败点是 `android-actions/setup-android@v3` 初始化 SDK，尚未进入 Gradle。
 当前流程固定 Ubuntu 24.04、JDK21、校验后的 Android CLI19、SDK36 / Build Tools36，
 不再请求已废弃的 `tools` 包。所有下载保留 TLS 和文件校验。
+
+项目固定 SDK36 作为已验证的 V1 基线。联网 runner 的 `OldTargetApi`（建议追随最新
+SDK）保留为信息提示，避免 SDK 发布日改变未修改代码的结果；其余 lint 仍使用
+`warningsAsErrors`，包括实际 API 兼容性和过期目标 SDK 检查。
