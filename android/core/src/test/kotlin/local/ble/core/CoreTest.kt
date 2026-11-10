@@ -154,4 +154,17 @@ class CoreTest {
         assertFalse(r.receive(sample(time = 50)))
         assertEquals(DeviceStatus.LOST, r.snapshot(10100, true).single().deviceStatus)
     }
+
+    @Test fun duplicateMeasurementsCannotChangeFilteringOrKeepADeviceOnline() {
+        val r = DeviceRepository(MemoryStore())
+        assertTrue(r.receive(sample(rssi = -60, time = 100)))
+        repeat(100) { assertFalse(r.receive(sample(rssi = -10, time = 100))) }
+        val state = r.snapshot(100, true).single()
+        assertEquals(-60, state.rssi)
+        assertEquals(-60.0, state.smoothedRssi!!, 0.0)
+        assertEquals(100L, state.lastSeenMs)
+        assertEquals(DeviceStatus.LOST, r.snapshot(10100, true).single().deviceStatus)
+        assertTrue(r.receive(sample(rssi = -59, time = 10200)))
+        assertEquals(DeviceStatus.PRESENT, r.snapshot(10200, true).single().deviceStatus)
+    }
 }

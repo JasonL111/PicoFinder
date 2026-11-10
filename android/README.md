@@ -44,6 +44,7 @@ https://developer.android.com/develop/connectivity/bluetooth/ble/find-ble-device
 使用 Service Data UUID + 版本字节 filter，而非 UUID List filter；原始 AD 还会由
 纯 Kotlin 解码器完整校验。SCAN_MODE_LOW_LATENCY 只在用户主动前台查找期间运行。
 主界面每秒更新一次；每次扫描最多 120 秒，6 秒内禁止重复启动，失败不自动无限重试。
+V1.1 收到新测量也会刷新界面；定时刷新只处理过期和超时，不推进极强信号稳定判定。
 Activity ON_STOP（包括切后台、锁屏和 Activity 重建）停止；返回后不自动扫描。
 蓝牙关闭广播即时停止；权限撤销及超时也停止。系统扫描错误用中文解释。
 
@@ -51,8 +52,31 @@ Activity ON_STOP（包括切后台、锁屏和 Activity 重建）停止；返回
 
 只有 debug 源集包含 FakeBleScanner。切换“调试演示（虚拟数据）”，点击开始扫描，
 无需 BLE 权限即可看到两标签；第二个标签每 30 秒中仅前 12 秒广播。
+第一个标签周期性达到极强信号，可预览 V1.1 圆环确认与普通强弱变化。
 UI 显示醒目的模拟提示；真实/模拟库分开，模拟设置仅在本次进程中保留。
 release 源集无假扫描器及演示开关。模拟模式不能证明真实权限或射频功能。
+模拟数据即使达到极强阈值也只显示视觉提示，不调用真实振动。
+
+## V1.1 极近振动
+
+普通权限 `VIBRATE` 只在 manifest 声明，不弹出危险权限请求。Android 12 使用
+`VibratorManager.defaultVibrator`、一次 120 ms `VibrationEffect` 和触感用途属性；
+Android 13+ 使用 `VibrationAttributes.USAGE_TOUCH`，API31–32 使用 sonification
+AudioAttributes。每次请求前检查硬件和勿扰状态；API31–32 读取系统触感开关，API33+
+由系统对 USAGE_TOUCH 应用触感开关/强度设置，避免依赖已废弃的旧设置。系统限制/异常安静降级。
+不申请通知策略访问，不设置绕过标记。不同厂商对触感设置的处理仍需真机验收。
+
+`StrongSignalDetector` 为纯 Kotlin，固定 -45 / -51 dBm，2 s 进入、3 s 退出、10 s 冷却；
+至少 6 / 8 个计数样本，计数间隔至少 100 ms，相邻有效测量间隔不超过 1 s，接收时年龄
+不超过 1 s，拒绝同毫秒/倒序/未来测量。短缺包隐藏极强确认并清空连续证据，但不解除
+单次锁；真正失联或会话结束才复位锁。冷却在页面/设备/扫描切换之间保留（进程内）。
+`FindSessionController` 约束选中设备、页面、扫描、前台、演示及用户开关；
+`HapticFeedbackController` 和 `HapticDevice` 支持注入 Fake，无需 Android 服务即可测试。
+Compose 不直接调用振动；导航与 Activity ON_STOP 同步关闭会话。
+
+持久化沿用 `finder-devices-v1` / `devices`，仅新增默认 true 的 `nearAlertVibration` 字段。
+旧记录原字段不变；阈值不写入用户设置。振动开关立即保存，不需点击“保存设置”；
+校准/改名/恢复默认校准都保留该开关。
 
 `core` 是纯 JVM 模块，解码器、可替换的 BleScanner 边界、滤波/测距/趋势/校准和
 DeviceRepository 均不依赖 Android。app 单元测试覆盖实际持久化 JSON 格式；Compose
@@ -63,5 +87,5 @@ APK：`app/build/outputs/apk/debug/app-debug.apk`；单元测试报告：
 `core/build/reports/tests/test/` 与 `app/build/reports/tests/testDebugUnitTest/`；
 lint：`app/build/reports/lint-results-debug.html`。CI 上传 APK 和报告；main / 版本 tag 验证
 通过后，CD 会发布可直接安装的 Debug APK、SHA256SUMS 和 build-info.json 到 GitHub Releases。
-流水线通过 finderVersionName / finderVersionCode Gradle 属性写入版本，本地默认仍为 1.0.0 / 1。
+流水线通过 finderVersionName / finderVersionCode Gradle 属性写入版本，本地默认为 1.1.0 / 2。
 release 可通过 `./gradlew :app:assembleRelease` 构建未签名包；V1 不配置发布密钥。

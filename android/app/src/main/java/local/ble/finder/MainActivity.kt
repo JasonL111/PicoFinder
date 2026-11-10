@@ -12,7 +12,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -26,14 +25,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import local.ble.core.*
 import java.text.SimpleDateFormat
@@ -58,14 +58,6 @@ class MainActivity : ComponentActivity() {
             val scheme = if (dark) darkColorScheme(primary = Color(0xff89d5c6))
                 else lightColorScheme(primary = Color(0xff006b5b))
             MaterialTheme(colorScheme = scheme) {
-                val lifecycleOwner = LocalLifecycleOwner.current
-                DisposableEffect(lifecycleOwner) {
-                    val observer = LifecycleEventObserver { _, event ->
-                        if (event == Lifecycle.Event.ON_STOP) vm.stop("应用进入后台，扫描已停止；返回后请主动开始")
-                    }
-                    lifecycleOwner.lifecycle.addObserver(observer)
-                    onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-                }
                 FinderApp(ui, vm, onStart = {
                     if (ui.demo || !packageManager.hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE) ||
                         AndroidBleScanner.hasPermissions(this)) vm.start()
@@ -80,6 +72,14 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+    override fun onStart() {
+        super.onStart()
+        vm.setForeground(true)
+    }
+    override fun onStop() {
+        vm.setForeground(false)
+        super.onStop()
+    }
 }
 
 private enum class Page { LIST, FIND, SETTINGS }
@@ -90,13 +90,22 @@ private fun FinderApp(ui: FinderUiState, vm: DeviceViewModel, onStart: () -> Uni
     var selected by rememberSaveable { mutableStateOf<Long?>(null) }
     val device = ui.devices.firstOrNull { it.deviceId == selected }
     val context = LocalContext.current
-    BackHandler(page != Page.LIST) { page = if (page == Page.SETTINGS) Page.FIND else Page.LIST }
+    fun navigate(destination: Page, id: Long? = selected) {
+        vm.setFindDevice(id.takeIf { destination == Page.FIND })
+        selected = id
+        page = destination
+    }
+    DisposableEffect(page, selected) {
+        vm.setFindDevice(selected.takeIf { page == Page.FIND })
+        onDispose { vm.setFindDevice(null) }
+    }
+    BackHandler(page != Page.LIST) { navigate(if (page == Page.SETTINGS) Page.FIND else Page.LIST) }
     Scaffold { padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding).imePadding().padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp), contentPadding = PaddingValues(bottom = 32.dp)) {
             item {
                 Row(Modifier.fillMaxWidth().padding(top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    if (page != Page.LIST) TextButton(onClick = { page = if (page == Page.SETTINGS) Page.FIND else Page.LIST }) { Text("返回") }
+                    if (page != Page.LIST) TextButton(onClick = { navigate(if (page == Page.SETTINGS) Page.FIND else Page.LIST) }) { Text("返回") }
                     Column(Modifier.weight(1f)) {
                         Text(if (page == Page.LIST) "Local BLE Finder" else if (page == Page.FIND) "查找标签" else "设置与校准",
                             style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
@@ -108,13 +117,13 @@ private fun FinderApp(ui: FinderUiState, vm: DeviceViewModel, onStart: () -> Uni
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text("调试演示（虚拟数据）", Modifier.weight(1f))
                     Switch(checked = ui.demo, onCheckedChange = {
-                        page = Page.LIST; selected = null; vm.setDemo(it)
-                    })
+                        navigate(Page.LIST, null); vm.setDemo(it)
+                    }, modifier = Modifier.testTag("demo-mode"))
                 }
             }
             if (ui.demo) item {
                 Surface(color = MaterialTheme.colorScheme.errorContainer, shape = RoundedCornerShape(12.dp)) {
-                    Text("模拟模式 · 以下不是实际蓝牙测量\n第二个标签会周期性失联，用于检查界面。", Modifier.padding(14.dp),
+                    Text("模拟模式 · 以下不是实际蓝牙测量\n极强信号仅显示视觉提示，不触发真实振动。第二个标签会周期性失联。", Modifier.padding(14.dp),
                         color = MaterialTheme.colorScheme.onErrorContainer)
                 }
             }
@@ -151,7 +160,7 @@ private fun FinderApp(ui: FinderUiState, vm: DeviceViewModel, onStart: () -> Uni
                         }
                     }
                     items(ui.devices, key = { it.deviceId }) { item ->
-                        Card(onClick = { selected = item.deviceId; page = Page.FIND }, modifier = Modifier.fillMaxWidth()) {
+                        Card(onClick = { navigate(Page.FIND, item.deviceId) }, modifier = Modifier.fillMaxWidth()) {
                             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Text(item.deviceName, style = MaterialTheme.typography.titleMedium)
                                 Text("ID %08X · 协议 v%d".format(item.deviceId, item.protocolVersion), style = MaterialTheme.typography.labelMedium)
@@ -162,19 +171,20 @@ private fun FinderApp(ui: FinderUiState, vm: DeviceViewModel, onStart: () -> Uni
                 }
                 Page.FIND -> item {
                     if (device == null) Text("设备已删除，请返回列表")
-                    else FindDevice(device, ui.scanning, onSettings = { page = Page.SETTINGS })
+                    else FindDevice(device, ui.scanning, ui.veryStrongSignal, onSettings = { navigate(Page.SETTINGS) })
                 }
                 Page.SETTINGS -> item {
                     if (device == null) Text("设备已删除，请返回列表")
                     else DeviceSettingsPanel(device, ui.calibrationDeviceId != null,
                         onSave = { name, n, reference, timeout -> vm.save(device.deviceId, name, n, reference, timeout) },
+                        onVibration = { vm.setNearAlertVibration(device.deviceId, it) },
                         onCalibrate = { vm.calibrate(device.deviceId) }, onReset = { vm.reset(device.deviceId) },
-                        onForget = { vm.forget(device.deviceId); selected = null; page = Page.LIST })
+                        onForget = { vm.forget(device.deviceId); navigate(Page.LIST, null) })
                 }
             }
             item {
                 HorizontalDivider()
-                Text("BLE RSSI 只能粗略估算距离，不是精确测距。遮挡、人体、朝向和反射都会影响结果；请观察数秒的整体趋势。",
+                Text("距离仅为粗略估算。人体、家具和墙壁会影响 RSSI；请观察数秒的强弱趋势，无法据此判断标签方向或所在房间。扫描不到也不能断言物品在室外。",
                     Modifier.padding(top = 12.dp), style = MaterialTheme.typography.bodySmall)
             }
         }
@@ -182,20 +192,42 @@ private fun FinderApp(ui: FinderUiState, vm: DeviceViewModel, onStart: () -> Uni
 }
 
 @Composable
-private fun FindDevice(device: DeviceState, scanning: Boolean, onSettings: () -> Unit) {
+private fun FindDevice(device: DeviceState, scanning: Boolean, veryStrong: Boolean, onSettings: () -> Unit) {
+    val live = scanning && device.smoothedRssi != null
+    val confirmed = live && veryStrong
+    val strength = when {
+        !live -> "等待信号"
+        confirmed -> "信号非常强"
+        device.signalBars >= 3 -> "信号较强"
+        device.signalBars == 2 -> "信号中等"
+        else -> "信号较弱"
+    }
+    val accent = if (confirmed) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(device.deviceName, style = MaterialTheme.typography.headlineMedium)
         Text("ID %08X".format(device.deviceId), style = MaterialTheme.typography.labelLarge)
-        Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.primaryContainer) {
+        Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), color =
+            if (confirmed) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.surfaceContainer) {
             Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(statusText(device.deviceStatus), style = MaterialTheme.typography.titleMedium)
+                Box(Modifier.size(172.dp).semantics { contentDescription = strength }, contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(progress = {
+                        if (!live) 0f else ((device.smoothedRssi!! + 100) / 65).toFloat().coerceIn(0f, 1f)
+                    }, modifier = Modifier.fillMaxSize(), color = accent,
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant, strokeWidth = 12.dp)
+                    Text(if (confirmed) "非常强" else strength.removePrefix("信号"),
+                        style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = accent)
+                }
+                Text(if (confirmed) "信号非常强 · 仔细找找附近" else strength,
+                    style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = accent,
+                    modifier = Modifier.testTag("signal-feedback"))
+                Text(if (!live) "等待新的有效广播" else when (device.trend) {
+                    Trend.APPROACHING -> "正在靠近 · 信号变强"; Trend.AWAY -> "正在远离 · 信号变弱"; Trend.STABLE -> "基本不变"
+                }, style = MaterialTheme.typography.headlineSmall)
                 val distance = device.estimatedDistance
                 Text(if (distance == null) "—" else if (distance >= 100) ">100" else if (distance < 0.1) "<0.1" else "%.1f".format(distance),
-                    fontSize = 64.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                    fontSize = 32.sp, fontWeight = FontWeight.Bold)
                 Text(if (distance == null) "暂无实时距离" else "约 · 米", style = MaterialTheme.typography.titleMedium)
-                Text(statusText(device.deviceStatus), style = MaterialTheme.typography.titleLarge)
-                Text(if (distance == null) "等待新的有效广播" else when (device.trend) {
-                    Trend.APPROACHING -> "正在靠近"; Trend.AWAY -> "正在远离"; Trend.STABLE -> "基本不变"
-                })
             }
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
@@ -203,15 +235,8 @@ private fun FindDevice(device: DeviceState, scanning: Boolean, onSettings: () ->
                 Text("末次 RSSI：${device.rssi?.let { "$it dBm" } ?: "—"}")
                 Text("平滑 RSSI：${device.smoothedRssi?.let { "%.1f dBm".format(it) } ?: "—"}")
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.Bottom) {
-                repeat(4) { bar ->
-                    Box(Modifier.width(12.dp).height((12 + bar * 9).dp).background(
-                        if (bar < device.signalBars) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                        RoundedCornerShape(3.dp)))
-                }
-            }
         }
-        Text("信号强度 ${device.signalBars}/4 · 电量 ${device.batteryLevel?.let { "$it%" } ?: "未知"}")
+        Text("电量 ${device.batteryLevel?.let { "$it%" } ?: "未知"} · 强弱分级仅供比较")
         val time = device.lastSeenWallMs?.let { SimpleDateFormat("HH:mm:ss", Locale.SIMPLIFIED_CHINESE).format(Date(it)) } ?: "从未接收"
         Text("最后收到：$time${if (!scanning) "（扫描已停止）" else ""}")
         Text("参考 RSSI：${device.calibrationParameters.rssiAt1m ?: device.advertisedReference.toDouble()} dBm · n=${device.calibrationParameters.pathLoss}",
@@ -222,15 +247,25 @@ private fun FindDevice(device: DeviceState, scanning: Boolean, onSettings: () ->
 
 @Composable
 private fun DeviceSettingsPanel(device: DeviceState, calibrating: Boolean,
-    onSave: (String, String, String, String) -> Unit, onCalibrate: () -> Unit, onReset: () -> Unit, onForget: () -> Unit) {
+    onSave: (String, String, String, String) -> Unit, onVibration: (Boolean) -> Unit,
+    onCalibrate: () -> Unit, onReset: () -> Unit, onForget: () -> Unit) {
     val settings = device.calibrationParameters
-    var name by remember(device.deviceId, settings) { mutableStateOf(settings.name) }
-    var n by remember(device.deviceId, settings) { mutableStateOf(settings.pathLoss.toString()) }
-    var reference by remember(device.deviceId, settings) { mutableStateOf(settings.rssiAt1m?.toString() ?: "") }
-    var timeout by remember(device.deviceId, settings) { mutableStateOf((settings.lostTimeoutMs / 1000).toString()) }
+    var name by remember(device.deviceId, settings.name) { mutableStateOf(settings.name) }
+    var n by remember(device.deviceId, settings.pathLoss) { mutableStateOf(settings.pathLoss.toString()) }
+    var reference by remember(device.deviceId, settings.rssiAt1m) { mutableStateOf(settings.rssiAt1m?.toString() ?: "") }
+    var timeout by remember(device.deviceId, settings.lostTimeoutMs) { mutableStateOf((settings.lostTimeoutMs / 1000).toString()) }
     var confirmDelete by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text("ID %08X · 协议 v%d".format(device.deviceId, device.protocolVersion), style = MaterialTheme.typography.titleMedium)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("极近提醒振动", style = MaterialTheme.typography.titleMedium)
+                Text("当蓝牙信号持续非常强时，手机会短暂振动一次。", style = MaterialTheme.typography.bodySmall)
+            }
+            Switch(checked = settings.nearAlertVibration, onCheckedChange = onVibration,
+                modifier = Modifier.testTag("near-alert-vibration").semantics { contentDescription = "极近提醒振动" })
+        }
+        Text("自动保存到当前设备；关闭振动仍可查看全部信号变化。", style = MaterialTheme.typography.bodySmall)
         OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("本地名称（最多 40 字）") },
             singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !calibrating)
         OutlinedTextField(value = n, onValueChange = { n = it }, label = { Text("环境衰减系数 n（1..6）") },
@@ -249,7 +284,7 @@ private fun DeviceSettingsPanel(device: DeviceState, calibrating: Boolean,
         TextButton(onClick = { confirmDelete = true }, enabled = !calibrating) { Text("删除本地设备记录", color = MaterialTheme.colorScheme.error) }
     }
     if (confirmDelete) AlertDialog(onDismissRequest = { confirmDelete = false },
-        title = { Text("删除本地记录？") }, text = { Text("仅删除名称和校准数据，不会关闭标签。如果仍在广播，扫描时会再次发现。") },
+        title = { Text("删除本地记录？") }, text = { Text("删除名称、校准和振动设置，不会关闭标签。如果仍在广播，扫描时会再次发现。") },
         confirmButton = { TextButton(onClick = { confirmDelete = false; onForget() }) { Text("删除") } },
         dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("取消") } })
 }

@@ -10,7 +10,22 @@ Android：`AndroidBleScanner : BleScanner` 负责权限/硬件状态检查、Ser
 `DeviceRepository` 按 uint32 ID（以 Long 保留无符号范围）管理设备、配置和最后接收；
 `DistanceEstimator` 与 `CalibrationCollector` 为纯 Kotlin；`DeviceViewModel` 在主线程
 整合扫描、每秒 UI tick 和校准；Compose 只消费统一 DeviceState。
-`PreferencesDeviceStore` 保存名称、参考值、n 和阈值，不保存 MAC 或 RSSI 历史。
+`PreferencesDeviceStore` 保存名称、参考值、n、失联超时和极近振动开关，不保存 MAC 或 RSSI 历史。
+
+V1.1 增量加入纯 Kotlin `StrongSignalDetector`，只消费设备库已平滑的新 BLE 测量。
+固定常量集中在该文件：-45 dBm 进入，-51 dBm 退出；2 / 3 秒、至少 6 / 8 个样本，
+采样计数至少相隔 100 ms、连续间隔最多 1 秒、样本接收年龄最多 1 秒；同毫秒和倒序
+样本不计数，UI tick 只会过期证据。强信号单次锁定，持续弱信号解除，10 秒冷却，
+冷却中的进入直接消耗而非排队补振；复位保留进程内冷却，防止切页/换设备绕过。
+缺包隐藏极强确认但不解除单次锁，失联/会话退出清除证据及锁。
+
+App 层 `FindSessionController` 把判定限定到前台、正在扫描、当前查找页面选中的 ID。
+设置/列表不持有查找 ID，切页与 ON_STOP 同步复位并取消振动；扫描 generation 拒绝旧回调。
+演示或关闭振动仍运行视觉判定，但不调用 haptic pulse。Android 振动使用可注入的
+`HapticFeedbackController` / `HapticDevice`；驱动检查系统设置和勿扰，不使用 bypass。
+名称、校准、n、失联检测、滤波与趋势算法未更换，无位置存储或新增数据库。
+`DeviceRepository.receive` 仅收紧时间戳入口校验：同一 ID 的相同时间戳与倒序样本一起
+丢弃，防止重复回调先污染中位数/EMA，再间接通过强信号判定。不同 ID 可使用相同时间戳。
 
 这里没有以硬件类型路由的分支，也没有 ESP-IDF Android 依赖。只有真实可替换的扫描和
 持久化边界使用接口；不建立冗余网络层或泛用插件框架。

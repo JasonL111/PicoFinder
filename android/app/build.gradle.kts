@@ -11,10 +11,10 @@ android {
         applicationId = "local.ble.finder"
         minSdk = 31
         targetSdk = 36
-        versionCode = providers.gradleProperty("finderVersionCode").orElse("1").get().toInt().also {
+        versionCode = providers.gradleProperty("finderVersionCode").orElse("2").get().toInt().also {
             require(it in 1..2100000000) { "finderVersionCode must be 1..2100000000" }
         }
-        versionName = providers.gradleProperty("finderVersionName").orElse("1.0.0").get()
+        versionName = providers.gradleProperty("finderVersionName").orElse("1.1.0").get()
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildFeatures { compose = true; buildConfig = true }

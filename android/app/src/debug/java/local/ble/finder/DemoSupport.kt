@@ -27,7 +27,9 @@ private class FakeBleScanner : BleScanner {
                 if (job !== this) return
                 val now = SystemClock.elapsedRealtime()
                 val phase = (now - start) / 18000.0 * Math.PI * 2
-                val rssi = (-67 + 12 * sin(phase)).toInt()
+                // Preview ordinary and sustained very-strong visual states; session policy
+                // always suppresses physical haptics for this transport.
+                val rssi = (-62 + 24 * sin(phase)).toInt()
                 // The second tag intentionally disappears after 12 s in every 30 s cycle.
                 listOf(0x12345678L, 0x87654321L).forEachIndexed { i, id ->
                     if (i == 0 || (now - start) % 30000 < 12000) {

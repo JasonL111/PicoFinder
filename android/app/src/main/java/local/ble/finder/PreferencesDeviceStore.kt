@@ -22,6 +22,7 @@ class PreferencesDeviceStore(private val preferences: SharedPreferences) : Devic
                     put("reference", settings.rssiAt1m ?: JSONObject.NULL)
                     put("pathLoss", settings.pathLoss)
                     put("timeout", settings.lostTimeoutMs)
+                    put("nearAlertVibration", settings.nearAlertVibration)
                 })
             }
             return root.toString()
@@ -36,7 +37,8 @@ class PreferencesDeviceStore(private val preferences: SharedPreferences) : Devic
                         val obj = root.getJSONObject(key)
                         val settings = DeviceSettings(obj.getString("name"),
                             if (obj.isNull("reference")) null else obj.getDouble("reference"),
-                            obj.getDouble("pathLoss"), obj.getLong("timeout"))
+                            obj.getDouble("pathLoss"), obj.getLong("timeout"),
+                            obj.optBoolean("nearAlertVibration", true))
                         if (settings.isValid()) id to settings else null
                     } catch (_: org.json.JSONException) { null }
                 }.toMap()
