@@ -23,6 +23,8 @@ App 层 `FindSessionController` 把判定限定到前台、正在扫描、当前
 设置/列表不持有查找 ID，切页与 ON_STOP 同步复位并取消振动；扫描 generation 拒绝旧回调。
 演示或关闭振动仍运行视觉判定，但不调用 haptic pulse。Android 振动使用可注入的
 `HapticFeedbackController` / `HapticDevice`；驱动检查系统设置和勿扰，不使用 bypass。
+数值界面保留 V1 每秒一次刷新，极强确认变化即时发布；每个新样本仍参与判定。
+空闲页面不在每次刷新时重复调用硬件取消，取消发生在会话边界、关闭开关或首次失联。
 名称、校准、n、失联检测、滤波与趋势算法未更换，无位置存储或新增数据库。
 `DeviceRepository.receive` 仅收紧时间戳入口校验：同一 ID 的相同时间戳与倒序样本一起
 丢弃，防止重复回调先污染中位数/EMA，再间接通过强信号判定。不同 ID 可使用相同时间戳。

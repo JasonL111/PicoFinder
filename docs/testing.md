@@ -25,7 +25,7 @@ V1 的中位数 + EMA、趋势、距离公式、校准和失联算法未修改�
 | Debug APK / UI test APK | **构建通过** | JDK21 / Gradle8.13 / SDK36 / min31，本地 1.1.0 / versionCode 2 |
 | Android lintDebug | **通过，0 问题** | 保留 warningsAsErrors；无新增豁免/baseline |
 | APK 签名 / manifest | **通过** | v2 Debug 签名；新增普通 VIBRATE，无 INTERNET / 后台位置 / 后台服务 |
-| API31 Compose / SharedPreferences | **尚未执行案例** | 测试包构建通过；软件模拟器系统服务重启导致安装失败，未计通过 |
+| API31 Compose / SharedPreferences | **4 通过，0 失败/跳过** | API31 AOSP 软件模拟器；完整 runner 203.421 s，`OK (4 tests)` |
 | V1.1 物理手机触感及 BLE | **未运行** | 本环境未连接物理手机或 Pico；需按下方清单验收 |
 
 首次工具安装同时解压模拟器镜像，临时磁盘不足，导致 Gradle 下载缓存无法写入；该次
@@ -37,9 +37,30 @@ API31 软件模拟器首次初始化及安装时出现 SystemServer 看门狗重
 `LooperStats.messageDispatchStarting`，安装返回 `Broken pipe`。这些尝试运行 **0 案例**，
 没有计作 UI 测试通过。已按 Android 12 官方运行时开关关闭模拟器的可选 LooperStats
 并重启测试框架，继续验证；此调整不进入 App，也不更改测试断言。
+首次实际 UI 流程又遇到 Compose 空闲超时，截图确认存在 System UI 无响应弹窗，
+该轮未算通过。关闭系统异常弹窗后，数值界面恢复 V1 每秒刷新、极强确认即时发布，
+空闲页面不再每次刷新调用硬件取消。重新安装最终 APK 并预编译，保持全部断言，
+完整四项直接 runner 最终 **203.421 s，OK (4 tests)**。失败输出保留在
+`/workspace/artifacts/v11-compose-ui-attempt1.txt`，成功输出在
+`/workspace/artifacts/v11-compose-ui-tests.txt`；它们均为软件模拟结果。
 
-本次导出：`/workspace/artifacts/local-ble-finder-v1.1-debug.apk`（29,820,826 字节），SHA-256：
-`33e177f07ac457fbdbebf95faed2122c3a655ccb5dfa07b4cb3475af9b81efc2`。
+本次成功的模拟器命令（两份 APK 预先构建）：
+
+```bash
+adb install --no-streaming -r -t app/build/outputs/apk/debug/app-debug.apk
+adb install --no-streaming -r -t app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+adb shell cmd package compile -m speed local.ble.finder
+adb shell cmd package compile -m speed local.ble.finder.test
+adb shell am instrument -w -r local.ble.finder.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+GitHub Actions 本任务首轮 [run 42919359855](https://github.com/JasonL111/PicoFinder/actions/runs/42919359855)
+（`ecadbee0`）的协议/发布测试、Android 测试/lint/构建/签名/制品打包均通过，publish 按
+PR 规则跳过。之后提交的最终 CI 以 [PR #1 Checks](https://github.com/JasonL111/PicoFinder/pull/1/checks)
+为准；每次运行的结果与其源码 SHA 对应。
+
+本次本地导出：`/workspace/artifacts/local-ble-finder-v1.1-debug.apk`（29,821,054 字节），SHA-256：
+`e4f6e637558db63d34e86bff4ee09653bb7052adf725451fe9fdd3b8fef1dccc`。
 报告位于 core/app 的标准 `build/reports/`；完整构建日志另存 `/workspace/artifacts/v11-build.log`。
 APK 不提交进 Git；PR/分支由原 Actions 生成 artifact，合并 main 后才更新 `dev-latest`，
 保留原下载链接及既有 Debug 签名限制，发布成功不能代替真机验收。

@@ -44,7 +44,8 @@ https://developer.android.com/develop/connectivity/bluetooth/ble/find-ble-device
 使用 Service Data UUID + 版本字节 filter，而非 UUID List filter；原始 AD 还会由
 纯 Kotlin 解码器完整校验。SCAN_MODE_LOW_LATENCY 只在用户主动前台查找期间运行。
 主界面每秒更新一次；每次扫描最多 120 秒，6 秒内禁止重复启动，失败不自动无限重试。
-V1.1 收到新测量也会刷新界面；定时刷新只处理过期和超时，不推进极强信号稳定判定。
+V1.1 保留每秒一次的 RSSI 数值刷新，避免广播频率主导绘制；极强确认变化即时发布。
+新 BLE 测量逐个推进判定，定时刷新只处理过期和超时，不能增加稳定时长或请求振动。
 Activity ON_STOP（包括切后台、锁屏和 Activity 重建）停止；返回后不自动扫描。
 蓝牙关闭广播即时停止；权限撤销及超时也停止。系统扫描错误用中文解释。
 

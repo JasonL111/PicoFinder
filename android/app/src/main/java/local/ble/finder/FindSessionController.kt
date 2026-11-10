@@ -13,6 +13,7 @@ class FindSessionController(private val haptics: HapticFeedbackController) {
     private var demo = false
     private var validAfterMs = 0L
     private var vibrationEnabled = true
+    private var signalAvailable = false
     val isVeryStrong get() = detector.isVeryStrong
     private val active get() = scanning && foreground && selectedId != null
 
@@ -20,6 +21,7 @@ class FindSessionController(private val haptics: HapticFeedbackController) {
         if (selectedId != deviceId || this.scanning != scanning || this.foreground != foreground || this.demo != demo) {
             detector.reset()
             haptics.cancel()
+            signalAvailable = false
             validAfterMs = nowMs
         }
         selectedId = deviceId
@@ -39,6 +41,7 @@ class FindSessionController(private val haptics: HapticFeedbackController) {
             device.deviceStatus != DeviceStatus.PRESENT && device.deviceStatus != DeviceStatus.WEAK) return
         updateVibrationEnabled(device.calibrationParameters.nearAlertVibration)
         val smooth = device.smoothedRssi ?: return
+        signalAvailable = true
         if (detector.onSample(smooth, sampleMs, nowMs) && vibrationEnabled && !demo) haptics.pulse()
     }
 
@@ -47,7 +50,8 @@ class FindSessionController(private val haptics: HapticFeedbackController) {
         if (!active || device == null || device.deviceId != selectedId || device.deviceStatus in
             setOf(DeviceStatus.LOST, DeviceStatus.SCAN_STOPPED, DeviceStatus.NEVER_SEEN)) {
             detector.reset()
-            haptics.cancel()
+            if (signalAvailable) haptics.cancel()
+            signalAvailable = false
         } else {
             updateVibrationEnabled(device.calibrationParameters.nearAlertVibration)
             detector.expire(nowMs)

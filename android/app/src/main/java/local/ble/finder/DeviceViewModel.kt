@@ -87,7 +87,10 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
                 if (_ui.value.calibrationDeviceId == sample.advertisement.deviceId) collector?.add(sample.rssi, sample.timeMs)
                 val device = repository.snapshot(now, true).first { it.deviceId == sample.advertisement.deviceId }
                 findSession.onMeasurement(device, sample.timeMs, now)
-                refresh()
+                // Keep V1's 1 Hz numeric UI cadence; BLE rate must not drive rendering.
+                // Confirmation still reacts immediately and only to new measurements.
+                val confirmed = findSession.isVeryStrong
+                if (_ui.value.veryStrongSignal != confirmed) _ui.value = _ui.value.copy(veryStrongSignal = confirmed)
             }
         }, { error -> if (generation == scanGeneration) stop(error) })
         if (failure != null) stop(failure)
