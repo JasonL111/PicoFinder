@@ -18,7 +18,7 @@ HapticFeedbackController、Debug / Release 扫描源集、固件、协议和 `.g
 | Debug APK / UI test APK | **构建通过** | JDK21 / Gradle8.13 / SDK36，本地 1.2.0 / versionCode 3 |
 | Android lintDebug | **通过，0 问题** | 保留 warningsAsErrors，无新增 baseline / 抑制 |
 | APK 签名 / manifest | **通过** | v2 Debug 签名；min31 / target36；权限与 V1.1 相同 |
-| API31 Compose / SharedPreferences | **执行中，尚未计为通过** | 软件模拟器；以最终 runner 原始结果为准 |
+| API31 Compose / SharedPreferences | **11 个唯一用例均有通过结果** | 完整轮次 10/11，修正后重跑 2 个受影响用例 2/2（重叠 1 项）；非单轮 11/11 |
 | 真实手机 / Pico / 耗电或帧率测量 | **未运行** | 本环境无物理手机 / Pico，不将软件结果视为真机体验 |
 
 完整开发命令（Android 目录，额外 cleanTest 确保测试实际重跑）：
@@ -30,9 +30,38 @@ adb install --no-streaming -r -t app/build/outputs/apk/androidTest/debug/app-deb
 adb shell am instrument -w -r local.ble.finder.test/androidx.test.runner.AndroidJUnitRunner
 ```
 
-完整构建 `BUILD SUCCESSFUL`，日志 `/workspace/artifacts/v1.2/build-final.log`，JUnit 与
+完整构建 `BUILD SUCCESSFUL`，最终视觉修正构建日志 `/workspace/artifacts/v1.2/build-review.log`，JUnit 与
 lint 报告位于标准 `android/*/build` 目录。首轮测试 APK 编译发现测试类的无效扩展导入，
 已删除并完整重跑；该轮失败没有计作通过。没有修改生产业务代码来绕过测试。
+
+API31 AOSP x86_64 使用无 KVM 的软件模拟器。启动阶段曾发生 SystemServer 看门狗重启，
+设备 runner 在进入用例前中断；另一次启动未就绪的尝试无法连接 ActivityManager，这些
+均没有算作 UI 通过。按 Android 12 官方 `Build.HW_TIMEOUT_MULTIPLIER` 调试机制设置
+本地模拟器 `ro.hw_timeout_multiplier=5` 并重启 zygote，预处理 APK、关闭截图已确认的
+System UI 无响应弹窗后，才实际完成首轮 11 项测试。该参数仅用于软件测试环境，不进入
+APK；该环境不能用于推断真机启动速度、帧率或耗电。
+
+首轮实际执行 **8 通过 / 3 失败**：首次模拟发现等待 10 s 超时、趋势断言误选文字的容器、
+大字体状态换行使下一张卡片上移 33 px。后两项分别修正为选择实际文字节点和使用
+`Text.minLines` 预留状态行；保留原卡片位置断言和 0.5 px 容差。模拟发现改为 30 s 的
+功能等待，并断言演示开关已开启，不改变 Fake 的 300 ms 样本节奏或扫描算法。
+首轮失败输出保留在 `/workspace/artifacts/v1.2/compose-attempt4.txt`，不得当作全通过结果。
+
+下一完整轮次 **10 通过 / 1 失败，646.662 s**，分级、动画、大字体卡片、数据保持及偏好
+均通过。剩余长流程在编辑设置后已没有“停止扫描”按钮，耗时跨过原 120 s 扫描上限。
+把停止及隐藏距离的验证提前到编辑名称之前，保留发现、圆环、改名、保存、返回断言；
+同时让顺序测试直接渲染生产 `DeviceListPage`，检查 320 dp / 1.8 倍字体下的真实 LazyColumn。
+仅重跑这两个修改过的用例，最终 **177.326 s，OK (2 tests)**。其余 9 个未改动用例沿用
+上述完整轮次的通过结果，最终覆盖 11 个不同用例。应用 APK 在这次测试调整前后相同，
+没有延长扫描时限、放宽卡片位置断言或改变业务参数。
+
+完整轮次原始日志：`/workspace/artifacts/v1.2/compose-attempt5.txt`；最终受影响用例日志：
+`/workspace/artifacts/v1.2/compose-affected-final.txt`；逐用例来源及最终状态：
+`/workspace/artifacts/v1.2/ui-validation.json`。最终重跑命令：
+
+```bash
+adb shell am instrument -w -r -e class local.ble.finder.DemoUiTest#demoDiscoveryRenameAndStopHideDistance,local.ble.finder.MotionUiTest#listIdentityAndOrderStayStableWhenSignalsCross local.ble.finder.test/androidx.test.runner.AndroidJUnitRunner
+```
 
 `MotionUiTest` 验证普通分级、原始峰值不能代替稳定确认、确认后极强文案、停止 / 失联
 掩蔽陈旧状态、450 ms 补间的中间值及结束值、静态降级、原 RSSI / 校准值保持、稳定列表、
@@ -40,8 +69,22 @@ lint 报告位于标准 `android/*/build` 目录。首轮测试 APK 编译发现
 查找 / 设置 / 列表往返、改名、停止、后台、开关保存 / Activity 重建及系统动画开关；
 原 SharedPreferences Android 兼容测试保留。测试动画使用可控 Compose 时钟。
 
+与 V1.1 主分支逐字节核对的 **32 个冻结文件无变化**（核心、扫描 / 会话 / 触感 / 存储、
+固件、协议、Fake / Release 源集、manifest、CI / 工具）；MainActivity 的权限与生命周期
+代码除替换主题块外完全一致。审计输出 `/workspace/artifacts/v1.2/compatibility-audit.json`。
+
+最终截图：`/workspace/artifacts/v1.2/screens-final/`，包含真实 Activity + Fake Scanner
+的查找 / 设置，以及明确标注受控模拟数据的浅色、深色、1.8 倍字体状态。新旧默认列表为
+`/workspace/artifacts/v1.2/v11-list.png`、`v12-list.png`，均由模拟器实际截图取得。
+截图没有生成或修饰；它们验证视觉呈现，不代表真实 BLE 或振动验收。
+
+首轮远端 [Actions run 43106394582](https://github.com/JasonL111/PicoFinder/actions/runs/43106394582)
+（`fbc3217`）已通过；最终提交检查以 [PR #2 Checks](https://github.com/JasonL111/PicoFinder/pull/2/checks)
+为准。原 CI 执行 Python / JVM / lint / APK 构建及签名打包，设备 UI 测试来自上述本地模拟器，
+没有把编译 test APK 等同于执行 UI 用例。
+
 本地 APK SHA-256：
-`a5645fb211036ee9f69c1c64fc6e45d1d9b4f60adfaa2642e975d560a0cac9c4`。
+`f3141ba252f4db37022ca46362279eb61015d2f4a91e244cf98000bd67e72667`。
 APK 不提交进 Git。CI 仍按 run 写入安装版本并上传制品，PR 不发布；合并 main 通过后，
 才更新现有 `dev-latest` 中的 APK，原下载 URL 不变。CI APK 的签名 / 版本和本地包不同，
 应使用该次构建的 `build-info.json` 与 `SHA256SUMS` 核对，不能混用本地哈希。

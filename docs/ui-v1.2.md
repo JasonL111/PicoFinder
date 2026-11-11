@@ -30,7 +30,8 @@ Android 返回键和顶部返回按钮使用原导航边界；退出查找的会
 | 技术详情 | 220 ms 展开、180 ms 收起；关闭动画时直接显示 / 隐藏 |
 
 信号和状态使用 Compose `animateFloatAsState`、`animateColorAsState`、`AnimatedContent`、
-`AnimatedVisibility`。进度采用 `FastOutSlowInEasing`，状态文字和列表状态预留行高，减少
+`AnimatedVisibility`。进度采用 `FastOutSlowInEasing`，列表状态通过原生 `Text.minLines`
+预留行数、适配字体缩放和换行，减少
 文字长短变化引起的布局移动。使用 Material 3 原生按钮、Switch、Card、输入框与按压反馈，
 没有新增第三方生产 UI 依赖。
 

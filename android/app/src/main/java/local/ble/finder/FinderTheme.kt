@@ -31,7 +31,9 @@ private val LightFinderColors = lightColorScheme(
     surface = Color(0xfffcfdfa), onSurface = Color(0xff172c25),
     surfaceVariant = Color(0xffe5ece7), onSurfaceVariant = Color(0xff52655d),
     surfaceContainer = Color(0xffedf2ee), surfaceContainerLow = Color(0xffffffff),
-    surfaceContainerHigh = Color(0xffe7eee9), outlineVariant = Color(0xffd3ded7),
+    surfaceContainerHigh = Color(0xffe7eee9), surfaceContainerHighest = Color(0xffdfe8e1),
+    surfaceContainerLowest = Color.White, surfaceDim = Color(0xffd7e1d9), surfaceBright = Color(0xfffcfdfa),
+    outline = Color(0xff73867b), outlineVariant = Color(0xffd3ded7), surfaceTint = Color(0xff006b58),
 )
 
 private val DarkFinderColors = darkColorScheme(
@@ -45,7 +47,9 @@ private val DarkFinderColors = darkColorScheme(
     surface = Color(0xff14201a), onSurface = Color(0xffe0ece3),
     surfaceVariant = Color(0xff2a3a31), onSurfaceVariant = Color(0xffb5c8bb),
     surfaceContainer = Color(0xff1c2b22), surfaceContainerLow = Color(0xff18251e),
-    surfaceContainerHigh = Color(0xff25372c), outlineVariant = Color(0xff3b5041),
+    surfaceContainerHigh = Color(0xff25372c), surfaceContainerHighest = Color(0xff2d4234),
+    surfaceContainerLowest = Color(0xff0c1510), surfaceDim = Color(0xff101a16), surfaceBright = Color(0xff2a3e31),
+    outline = Color(0xff82988a), outlineVariant = Color(0xff3b5041), surfaceTint = Color(0xff8cdbbf),
 )
 
 private val FinderTypography = Typography(

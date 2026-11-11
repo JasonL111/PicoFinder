@@ -12,16 +12,23 @@ import org.junit.Test
 /** Real Compose UI with debug fake transport. Does not claim any physical BLE validation. */
 class DemoUiTest {
     @get:Rule val rule = createAndroidComposeRule<MainActivity>()
+    // A functional wait, allowing cold software emulators to initialize; not a BLE latency claim.
+    private val discoveryWaitMs = 30_000L
 
     @Test fun demoDiscoveryRenameAndStopHideDistance() {
         val vm = rule.runOnIdle { ViewModelProvider(rule.activity)[DeviceViewModel::class.java] }
-        rule.onNodeWithTag("demo-mode").performClick()
+        rule.onNodeWithTag("demo-mode").performClick().assertIsOn()
         rule.onNodeWithText("开始扫描").performClick()
-        rule.waitUntil(10000) { vm.ui.value.devices.any { it.deviceId == 0x12345678L } }
+        rule.waitUntil(discoveryWaitMs) { vm.ui.value.devices.any { it.deviceId == 0x12345678L } }
         rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("标签 12345678"))
         rule.onNodeWithText("标签 12345678").performClick()
         rule.onNodeWithTag("signal-ring").assertIsDisplayed()
         saveUiScreenshot(rule, "v12-app-find.png")
+        // Stop before editing: keep this functional flow within the real two-minute scan cap.
+        rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("停止扫描"))
+        rule.onNodeWithText("停止扫描").performClick()
+        rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("暂无实时距离"))
+        rule.onNodeWithText("暂无实时距离").assertExists()
         rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("设备设置与 1 米校准"))
         rule.onNodeWithText("设备设置与 1 米校准").performClick()
         rule.onNodeWithTag("near-alert-vibration").assertIsDisplayed()
@@ -30,10 +37,6 @@ class DemoUiTest {
         rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("保存设置"))
         rule.onNodeWithText("保存设置").performClick()
         rule.onNodeWithContentDescription("返回").performClick()
-        rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("停止扫描"))
-        rule.onNodeWithText("停止扫描").performClick()
-        rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("暂无实时距离"))
-        rule.onNodeWithText("暂无实时距离").assertExists()
         rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("演示钥匙"))
         rule.onNodeWithText("演示钥匙").assertExists()
         rule.onNodeWithContentDescription("返回").performClick()
@@ -41,7 +44,7 @@ class DemoUiTest {
     }
 
     @Test fun backgroundingStopsForegroundScan() {
-        rule.onNodeWithTag("demo-mode").performClick()
+        rule.onNodeWithTag("demo-mode").performClick().assertIsOn()
         rule.onNodeWithText("开始扫描").performClick()
         rule.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
         rule.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
@@ -52,9 +55,9 @@ class DemoUiTest {
 
     @Test fun vibrationSwitchSavesImmediatelyAndHasNoStrongRssiEditor() {
         val vm = rule.runOnIdle { ViewModelProvider(rule.activity)[DeviceViewModel::class.java] }
-        rule.onNodeWithTag("demo-mode").performClick()
+        rule.onNodeWithTag("demo-mode").performClick().assertIsOn()
         rule.onNodeWithText("开始扫描").performClick()
-        rule.waitUntil(10000) { vm.ui.value.devices.any { it.deviceId == 0x12345678L } }
+        rule.waitUntil(discoveryWaitMs) { vm.ui.value.devices.any { it.deviceId == 0x12345678L } }
         rule.onNodeWithText("停止扫描").performClick()
         rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("标签 12345678"))
         rule.onNodeWithText("标签 12345678").performClick()

@@ -43,7 +43,7 @@ class MotionUiTest {
         rule.onNodeWithText("信号非常强 · 仔细找找附近").assertDoesNotExist()
         rule.runOnIdle { confirmed = true }
         rule.onNodeWithTag("signal-feedback").assertTextEquals("信号非常强 · 仔细找找附近")
-        rule.onNodeWithTag("trend-feedback").assertTextEquals("正在靠近 · 信号变强")
+        rule.onNodeWithText("正在靠近 · 信号变强").assertExists()
     }
 
     @Test fun lossAndStopMaskEvenStaleStrongPresentation() {
@@ -108,11 +108,17 @@ class MotionUiTest {
         rule.setContent {
             val density = LocalDensity.current.density
             CompositionLocalProvider(LocalDensity provides Density(density, 1.8f)) {
-                PicoFinderTheme { Surface {
-            Column(Modifier.width(320.dp).fillMaxHeight().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                devices.forEach { d -> key(d.deviceId) { DeviceListCard(d, motionEnabled = false, onClick = {}) } }
+                PicoFinderTheme {
+                    Surface(Modifier.width(320.dp).fillMaxHeight()) {
+                        DeviceListPage(FinderUiState(devices = devices, scanning = true, demo = true,
+                            message = "受控模拟数据"), motionEnabled = false, onSelect = {}, onStart = {},
+                            onStop = {}, onDemo = {}, onBluetooth = {}, onLocation = {}, onPermissions = {})
+                    }
+                }
             }
-        } } } }
+        }
+        // Exercise the production LazyColumn, including its keys and ordering, on a small viewport.
+        rule.onNodeWithTag("device-list").performScrollToNode(hasTestTag("device-2"))
         val first = rule.onNodeWithTag("device-1").fetchSemanticsNode().boundsInRoot
         val second = rule.onNodeWithTag("device-2").fetchSemanticsNode().boundsInRoot
         assertTrue(first.top < second.top)

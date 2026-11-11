@@ -35,6 +35,7 @@ import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import local.ble.core.DeviceState
@@ -56,13 +57,13 @@ internal fun FinderCard(modifier: Modifier = Modifier, content: @Composable Colu
 
 @Composable
 internal fun SoftStateText(text: String, motionEnabled: Boolean, modifier: Modifier = Modifier,
-    color: Color = MaterialTheme.colorScheme.onSurfaceVariant) {
+    color: Color = MaterialTheme.colorScheme.onSurfaceVariant, minLines: Int = 1) {
     AnimatedContent(text, modifier = modifier, transitionSpec = {
         ((if (motionEnabled) fadeIn(tween(FinderStyle.stateMotionMs)) else EnterTransition.None) togetherWith
             (if (motionEnabled) fadeOut(tween(120)) else ExitTransition.None)).using(
                 if (motionEnabled) SizeTransform(clip = false, sizeAnimationSpec = { _, _ -> tween(FinderStyle.stateMotionMs) }) else null)
     }, label = "state-label") { value ->
-        Text(value, style = MaterialTheme.typography.labelLarge, color = color)
+        Text(value, style = MaterialTheme.typography.labelLarge, color = color, minLines = minLines)
     }
 }
 
@@ -173,12 +174,9 @@ internal fun DeviceListCard(device: DeviceState, motionEnabled: Boolean, onClick
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(device.deviceName, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                val statusHeight = with(LocalDensity.current) {
-                    (MaterialTheme.typography.labelLarge.lineHeight * 2).toDp()
-                }
-                Box(Modifier.heightIn(min = statusHeight), contentAlignment = Alignment.CenterStart) {
-                    SoftStateText(statusText(device.deviceStatus), motionEnabled)
-                }
+                // Text owns line measurement, including nonlinear system font scaling.
+                SoftStateText(statusText(device.deviceStatus), motionEnabled,
+                    minLines = if (LocalDensity.current.fontScale > 1.35f) 3 else 2)
                 Text(device.rssi?.let { "末次 $it dBm" } ?: "等待首次广播",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -283,7 +281,8 @@ internal fun SignalHero(device: DeviceState, scanning: Boolean, veryStrong: Bool
                 }
             }
             val messageHeight = with(LocalDensity.current) {
-                (MaterialTheme.typography.titleMedium.lineHeight * if (fontScale > 1.35f) 3 else 2).toDp()
+                MaterialTheme.typography.titleMedium.lineHeight.toDp() *
+                    if (fontScale > 1.35f) 3 else if (fontScale > 1.1f) 2 else 1
             }
             Box(Modifier.fillMaxWidth().heightIn(min = messageHeight), contentAlignment = Alignment.Center) {
                 AnimatedContent(if (confirmed) "信号非常强 · 仔细找找附近" else strength,
@@ -293,7 +292,7 @@ internal fun SignalHero(device: DeviceState, scanning: Boolean, veryStrong: Bool
                                 if (motionEnabled) SizeTransform(clip = false,
                                     sizeAnimationSpec = { _, _ -> tween(FinderStyle.stateMotionMs) }) else null)
                     }, label = "confirmed-message") { text ->
-                    Text(text, style = MaterialTheme.typography.titleMedium, color = accent,
+                    Text(text, style = MaterialTheme.typography.titleMedium, color = accent, textAlign = TextAlign.Center,
                         modifier = Modifier.testTag("signal-feedback"))
                 }
             }
@@ -316,18 +315,14 @@ private fun TrendFeedback(trend: Trend?, motionEnabled: Boolean) {
         Trend.STABLE -> "基本不变"
         null -> "等待新的有效广播"
     }
-    val textHeight = with(LocalDensity.current) {
-        (MaterialTheme.typography.labelLarge.lineHeight * 2).toDp()
-    }
     Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer,
         modifier = Modifier.fillMaxWidth()) {
         Row(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp),
                 tint = MaterialTheme.colorScheme.primary)
-            Box(Modifier.weight(1f).heightIn(min = textHeight), contentAlignment = Alignment.CenterStart) {
-                SoftStateText(text, motionEnabled, modifier = Modifier.testTag("trend-feedback"))
-            }
+            SoftStateText(text, motionEnabled, modifier = Modifier.weight(1f).testTag("trend-feedback"),
+                minLines = if (LocalDensity.current.fontScale > 1.1f) 2 else 1)
         }
     }
 }
