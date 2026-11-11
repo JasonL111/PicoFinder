@@ -1,5 +1,69 @@
 # 验证记录与人工验收
 
+## V1.2 验证（2026-11-11）
+
+本次为 Android 视觉层增量升级。对比 V1.1 主分支 `3689d3b`，`android/core/src/main`、
+DeviceViewModel、AndroidBleScanner、PreferencesDeviceStore、FindSessionController、
+HapticFeedbackController、Debug / Release 扫描源集、固件、协议和 `.github` 均没有修改。
+现有 -45 / -51 dBm、稳定样本、短振和冷却策略保留，UI 只展示已有确认状态。
+
+### 本次实际执行
+
+| 检查 | 结果 | 范围 |
+|---|---|---|
+| Python 协议 / 固件模拟 | **9 通过，0 失败 / 跳过** | `python -m unittest discover -s tests/protocol -v` |
+| Python 发布机制 | **13 通过，0 失败 / 跳过** | `python -m unittest discover -s tests/ci -v` |
+| Kotlin core JVM | **23 通过，0 失败 / 跳过** | 清除 test 输出后重跑，含 V1.1 固定阈值 / 新鲜样本 / 冷却回归 |
+| Android app JVM | **15 通过，0 失败 / 跳过** | 清除 test 输出后重跑，含会话隔离、Fake 触感及设置兼容 |
+| Debug APK / UI test APK | **构建通过** | JDK21 / Gradle8.13 / SDK36，本地 1.2.0 / versionCode 3 |
+| Android lintDebug | **通过，0 问题** | 保留 warningsAsErrors，无新增 baseline / 抑制 |
+| APK 签名 / manifest | **通过** | v2 Debug 签名；min31 / target36；权限与 V1.1 相同 |
+| API31 Compose / SharedPreferences | **执行中，尚未计为通过** | 软件模拟器；以最终 runner 原始结果为准 |
+| 真实手机 / Pico / 耗电或帧率测量 | **未运行** | 本环境无物理手机 / Pico，不将软件结果视为真机体验 |
+
+完整开发命令（Android 目录，额外 cleanTest 确保测试实际重跑）：
+
+```bash
+./gradlew :core:cleanTest :core:test :app:cleanTestDebugUnitTest :app:testDebugUnitTest :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest
+adb install --no-streaming -r -t app/build/outputs/apk/debug/app-debug.apk
+adb install --no-streaming -r -t app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+adb shell am instrument -w -r local.ble.finder.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+完整构建 `BUILD SUCCESSFUL`，日志 `/workspace/artifacts/v1.2/build-final.log`，JUnit 与
+lint 报告位于标准 `android/*/build` 目录。首轮测试 APK 编译发现测试类的无效扩展导入，
+已删除并完整重跑；该轮失败没有计作通过。没有修改生产业务代码来绕过测试。
+
+`MotionUiTest` 验证普通分级、原始峰值不能代替稳定确认、确认后极强文案、停止 / 失联
+掩蔽陈旧状态、450 ms 补间的中间值及结束值、静态降级、原 RSSI / 校准值保持、稳定列表、
+浅色 / 深色与 1.8 倍字体。`DemoUiTest` 使用真实 Activity + Fake Scanner 验证发现、
+查找 / 设置 / 列表往返、改名、停止、后台、开关保存 / Activity 重建及系统动画开关；
+原 SharedPreferences Android 兼容测试保留。测试动画使用可控 Compose 时钟。
+
+本地 APK SHA-256：
+`a5645fb211036ee9f69c1c64fc6e45d1d9b4f60adfaa2642e975d560a0cac9c4`。
+APK 不提交进 Git。CI 仍按 run 写入安装版本并上传制品，PR 不发布；合并 main 通过后，
+才更新现有 `dev-latest` 中的 APK，原下载 URL 不变。CI APK 的签名 / 版本和本地包不同，
+应使用该次构建的 `build-info.json` 与 `SHA256SUMS` 核对，不能混用本地哈希。
+
+### 已发布版本核对
+
+本次实际下载的旧 `dev-latest` 为 `dev.10` / 1010，源提交 `3689d3b`，APK SHA-256
+`636624c6d1291f74298b3dd0dc3c17137f12f7bdaa6b4e4ad99d653fd70e2e3c`，与其发布元数据一致，
+包内包含 V1.1 极强提示和振动开关文字。这不能证明用户手机当时安装的是哪一个 APK。
+V1.2 页头标识和安装版本信息、每页独立滚动用于改善识别与可见性；不能据此把未证实的
+“缓存”或“安装错版本”当作已确定原因。Releases 固定条目的创建日期不代表最新 APK 构建日期。
+
+### V1.2 真机验收清单（待用户执行）
+
+- [ ] 确认页头 V1.2；设置“关于”的安装版本与下载构建元数据相符，原名称 / 校准 / 开关仍在。
+- [ ] 关闭演示、使用原 Pico 固件扫描；进入查找可直接看到圆环，设置页顶部可见振动开关。
+- [ ] 室内缓慢走动，圆环平滑变化，图标与文字表达靠近 / 远离 / 稳定，展开可查看原 RSSI。
+- [ ] 普通信号和短峰值不振；稳定极强才一次短振，持续强信号不重复；关闭开关仍可完整查找。
+- [ ] 停止扫描、拔 USB、返回列表、后台 / 锁屏后没有陈旧实时强信号或新触感；返回仍需手动扫描。
+- [ ] 深浅主题、小屏、系统大字体与关闭动画时内容可读、可滚动，页面返回和校准可操作。
+- [ ] 两个标签不因强弱变化重排；实际观察页面卡顿、发热和耗电，如异常记录手机 / 系统 / 步骤。
+
 ## V1.1 验证（2026-11-10）
 
 本次仅修改 Android 查找体验；固件、UUID、v1 数据格式和 Device ID 语义未改动。

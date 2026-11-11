@@ -79,6 +79,24 @@ Compose 不直接调用振动；导航与 Activity ON_STOP 同步关闭会话。
 旧记录原字段不变；阈值不写入用户设置。振动开关立即保存，不需点击“保存设置”；
 校准/改名/恢复默认校准都保留该开关。
 
+## V1.2 视觉层
+
+`MainActivity.kt` 保留原导航 / 会话边界，使用 `AnimatedContent` 做 240 ms 页面过渡；
+各页独立滚动。`FinderScreens.kt` 实现设备卡片、信号主视觉、概况与折叠详情；
+`FinderTheme.kt` 集中色彩、排版、圆角和动画时长，`FinderIcons.kt` 提供统一线形图标。
+`FinderMotion.kt` 只观察前台生命周期与系统动画设置，不持有扫描器或触感控制器。
+
+圆环使用 `animateFloatAsState` 和 `FastOutSlowInEasing`，450 ms 插值原有平滑 RSSI 的
+显示进度，2% 取整仅用于绘制。`animateColorAsState` 与有限淡入淡出表达状态，不创建普通
+扫描的无限循环。极强视觉只消费已有 `veryStrongSignal`；不根据动画或原始峰值判定。
+后台或系统 `animator_duration_scale=0` 时移除视觉补间，静态内容可读、可操作。
+无新增生产 UI 库；`ui-test-manifest` 仅在 Debug 为独立 Compose 测试提供宿主 Activity。
+
+`MotionUiTest` 用受控模拟状态检查分级、失联掩蔽、动画中间值与静态降级、RSSI 不变、
+设备顺序、深浅主题及 1.8 倍字体；`DemoUiTest` 保留真实 Activity + Fake Scanner 的导航、
+停止 / 后台与持久化交互。截图来自实际 Compose 渲染，不代表物理 BLE 或振动验收。
+设计说明见 [ui-v1.2.md](../docs/ui-v1.2.md)，实际执行结果见 [testing.md](../docs/testing.md)。
+
 `core` 是纯 JVM 模块，解码器、可替换的 BleScanner 边界、滤波/测距/趋势/校准和
 DeviceRepository 均不依赖 Android。app 单元测试覆盖实际持久化 JSON 格式；Compose
 instrumentation 测试使用真正的 MainActivity + Fake Scanner 检查页面、重命名、停止和
@@ -88,5 +106,5 @@ APK：`app/build/outputs/apk/debug/app-debug.apk`；单元测试报告：
 `core/build/reports/tests/test/` 与 `app/build/reports/tests/testDebugUnitTest/`；
 lint：`app/build/reports/lint-results-debug.html`。CI 上传 APK 和报告；main / 版本 tag 验证
 通过后，CD 会发布可直接安装的 Debug APK、SHA256SUMS 和 build-info.json 到 GitHub Releases。
-流水线通过 finderVersionName / finderVersionCode Gradle 属性写入版本，本地默认为 1.1.0 / 2。
+流水线通过 finderVersionName / finderVersionCode Gradle 属性写入版本，本地默认为 1.2.0 / 3。
 release 可通过 `./gradlew :app:assembleRelease` 构建未签名包；V1 不配置发布密钥。
