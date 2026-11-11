@@ -1,6 +1,119 @@
 # 验证记录与人工验收
 
-## 本次会话实际结果
+## V1.1 验证（2026-11-10）
+
+本次仅修改 Android 查找体验；固件、UUID、v1 数据格式和 Device ID 语义未改动。
+V1 的中位数 + EMA、趋势、距离公式、校准和失联算法未修改。
+唯一收紧的接收规则是 `DeviceRepository.receive` 拒绝同一 ID 的相同时间戳（V1 仅拒绝
+倒序），防止重复包先改变平滑值。新增设备库与会话组合回归，原有 V1 测试完整保留。
+
+### 用户提供的 V1 真机反馈
+
+用户已反馈 Raspberry Pi Pico 2 W / MicroPython 1.27.0 持续 USB 供电广播、Android
+扫描发现成功；在 0.5 m、1 m、3 m 观察到基本合理的 RSSI / 距离趋势；拔掉 USB 可检测
+失联；重启 Pico 后 ID 保持不变。该反馈证明已试过的链路可用，**不代表所有软硬件、
+精确测距或 V1.1 振动已经验收**。本次无需改固件或重刷 MicroPython。
+
+### 本次软件执行记录
+
+| 检查 | 结果 | 范围 |
+|---|---|---|
+| Python 协议/固件模拟 | 9 通过 | `python -m unittest discover -s tests/protocol -v` |
+| Python 发布流程 | 13 通过 | `python -m unittest discover -s tests/ci -v`；包括 PR 不发布与主分支发布保护 |
+| Kotlin core JVM | **23 通过，0 失败/跳过** | 原有 11 项 + 1 项入库去重 + 11 项极强判定；未使用 Thread.sleep |
+| Android app JVM | **15 通过，0 失败/跳过** | 11 项会话/触感策略 + 4 项持久化格式测试 |
+| Debug APK / UI test APK | **构建通过** | JDK21 / Gradle8.13 / SDK36 / min31，本地 1.1.0 / versionCode 2 |
+| Android lintDebug | **通过，0 问题** | 保留 warningsAsErrors；无新增豁免/baseline |
+| APK 签名 / manifest | **通过** | v2 Debug 签名；新增普通 VIBRATE，无 INTERNET / 后台位置 / 后台服务 |
+| API31 Compose / SharedPreferences | **4 通过，0 失败/跳过** | API31 AOSP 软件模拟器；完整 runner 203.421 s，`OK (4 tests)` |
+| V1.1 物理手机触感及 BLE | **未运行** | 本环境未连接物理手机或 Pico；需按下方清单验收 |
+
+首次工具安装同时解压模拟器镜像，临时磁盘不足，导致 Gradle 下载缓存无法写入；该次
+失败未算通过。清理本次已解压的下载包，先完成构建，再准备模拟器。
+官方 API31 r05 镜像按 SDK 元数据 SHA-1 校验，按原字节稀疏解压节省零填充空间；
+模拟器使用独立小数据分区，未改 APK 或测试断言。最终完整 Gradle 命令成功，随后对
+Android 13+ 系统设置兼容和 Debug 视觉预览调整再完整验证，最后一轮 **BUILD SUCCESSFUL**。
+API31 软件模拟器首次初始化及安装时出现 SystemServer 看门狗重启，日志明确阻塞于
+`LooperStats.messageDispatchStarting`，安装返回 `Broken pipe`。这些尝试运行 **0 案例**，
+没有计作 UI 测试通过。已按 Android 12 官方运行时开关关闭模拟器的可选 LooperStats
+并重启测试框架，继续验证；此调整不进入 App，也不更改测试断言。
+首次实际 UI 流程又遇到 Compose 空闲超时，截图确认存在 System UI 无响应弹窗，
+该轮未算通过。关闭系统异常弹窗后，数值界面恢复 V1 每秒刷新、极强确认即时发布，
+空闲页面不再每次刷新调用硬件取消。重新安装最终 APK 并预编译，保持全部断言，
+完整四项直接 runner 最终 **203.421 s，OK (4 tests)**。失败输出保留在
+`/workspace/artifacts/v11-compose-ui-attempt1.txt`，成功输出在
+`/workspace/artifacts/v11-compose-ui-tests.txt`；它们均为软件模拟结果。
+
+本次成功的模拟器命令（两份 APK 预先构建）：
+
+```bash
+adb install --no-streaming -r -t app/build/outputs/apk/debug/app-debug.apk
+adb install --no-streaming -r -t app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+adb shell cmd package compile -m speed local.ble.finder
+adb shell cmd package compile -m speed local.ble.finder.test
+adb shell am instrument -w -r local.ble.finder.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+GitHub Actions 本任务首轮 [run 42919359855](https://github.com/JasonL111/PicoFinder/actions/runs/42919359855)
+（`ecadbee0`）的协议/发布测试、Android 测试/lint/构建/签名/制品打包均通过，publish 按
+PR 规则跳过。之后提交的最终 CI 以 [PR #1 Checks](https://github.com/JasonL111/PicoFinder/pull/1/checks)
+为准；每次运行的结果与其源码 SHA 对应。
+
+本次本地导出：`/workspace/artifacts/local-ble-finder-v1.1-debug.apk`（29,821,054 字节），SHA-256：
+`e4f6e637558db63d34e86bff4ee09653bb7052adf725451fe9fdd3b8fef1dccc`。
+报告位于 core/app 的标准 `build/reports/`；完整构建日志另存 `/workspace/artifacts/v11-build.log`。
+APK 不提交进 Git；PR/分支由原 Actions 生成 artifact，合并 main 后才更新 `dev-latest`，
+保留原下载链接及既有 Debug 签名限制，发布成功不能代替真机验收。
+
+开发者完整命令（`android/` 目录）：
+
+```bash
+./gradlew :core:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest
+# API31+ 模拟器或手机已连接时
+./gradlew :app:connectedDebugAndroidTest
+```
+
+`StrongSignalDetectorTest` 用时间参数，无 Thread.sleep，覆盖普通信号、异常峰值、
+-45 dBm 持续 2 s、单次锁、-44/-46 抖动、-51 dBm 持续 3 s、10 s 冷却、稀疏/突发/
+同毫秒/倒序/陈旧/未来样本、UI tick、退出复位及不同校准不改变固定阈值。
+进入至少 6 个、退出至少 8 个计数样本；计数间隔至少 100 ms，连续间隔及接收年龄最多 1 s。
+短缺包清空连续证据并隐藏极强确认，不自行解除单次锁；真正失联或会话退出才复位。
+冷却期内的进入直接消耗，不到期补振，换设备/重进页面也不能绕过进程内冷却。
+`CoreTest` 额外验证重复包不能改写末次 RSSI / 平滑 RSSI / 时间，也不能保持在线，随后
+新测量仍可重连；会话组合测试验证重复原始峰值无法通过污染滤波制造极强提醒。
+
+`FindSessionControllerTest` 注入 Fake HapticDevice，验证只有选中设备的真实前台扫描
+会话可请求 pulse；关闭振动仍可视觉确认，列表/设置/后台/停止/失联/演示/其他设备不
+触发，取消调用立即发生，无硬件/系统关闭/驱动抛异常安静降级。与真实 DeviceRepository
+组合验证单个原始强峰值不会穿过现有滤波误触发。它们验证软件策略，不能证明物理马达行为。
+保留 V1 的 WEAK 状态语义：原始 RSSI 很低但仍新鲜的广播也参与退出判定，不会因为
+状态标签为“弱信号”而阻止 -51 dBm 以下的持续弱信号解除单次提醒锁。
+
+`PreferencesDeviceStoreTest` 验证 V1 JSON 默认开启、旧字段保留、每 ID 独立开关、多次
+保存/加载与校准 copy 保留开关，设置中只有旧字段和新开关，不存极强阈值。
+`PreferencesDeviceStoreAndroidTest` 使用真实 Android SharedPreferences 检查旧数据升级及
+重新打开 Store。Compose 测试检查开关立即保存、页面往返/Activity 重建、恢复校准保留
+开关和仅有原来四个文本输入（不增加极强阈值入口），并保留 V1 模拟发现/改名/后台测试。
+
+### V1.1 真机验收清单（待用户执行）
+
+- [ ] 记录手机型号、Android 版本与系统触感/勿扰设置；安装后关闭调试演示，原 Pico 固件可继续扫描。
+- [ ] 原名称、1 m 校准、n、失联超时保留；旧设备开关默认开启；关闭后杀进程重开仍关闭。
+- [ ] 在约 30 m² 住宅走动，圆环与靠近/远离趋势易读；普通强弱变化全程无振动。
+- [ ] 缓慢接近，平滑 RSSI 到 -45 dBm 或更强持续约 2 s 后短振一次；短暂峰值不振，持续强信号不重复。
+- [ ] 观察 -44/-46 dBm 附近波动不重复；降至 -51 dBm 或更弱约 3 s 后再进入，且距上次至少 10 s 才可能再次短振。
+- [ ] 关闭极近振动：仍有完整视觉提示，全程不振；勿扰/关闭系统触感/无马达设备安静降级。
+- [ ] 两标签选择隔离；返回列表、进入设置、停止扫描、拔掉标签 USB、锁屏/后台后均不振；回来需手动扫描并重新积累样本。
+- [ ] 演示模式无真实振动；2 分钟自动停止仍有效；1 m 校准、失联后重连与多个设备仍正常。
+- [ ] 在第二种 Android 版本/厂商手机上重复触感测试；如有同协议 ESP32-C3 再验兼容（本次未验证该硬件）。
+
+固定 -45/-51 dBm 与粗略距离没有一一对应关系，部分手机/标签组合可能难以达到 -45；
+不能为了触发而在 UI 修改阈值，也不能用未振动断言物品不在附近。系统/厂商可能抑制
+触感；无真实手机时不能宣称系统设置与物理振动体验已全部测试通过。
+
+## V1 历史软件验证记录（此前会话）
+
+下列数字与 artifact 路径为 V1 的历史记录，不视为本次 V1.1 已重跑的结果。
 
 | 检查 | 结果 | 说明 |
 |---|---|---|

@@ -13,7 +13,7 @@ class DemoUiTest {
 
     @Test fun demoDiscoveryRenameAndStopHideDistance() {
         val vm = rule.runOnIdle { ViewModelProvider(rule.activity)[DeviceViewModel::class.java] }
-        rule.onNode(isToggleable()).performClick()
+        rule.onNodeWithTag("demo-mode").performClick()
         rule.onNodeWithText("开始扫描").performClick()
         rule.waitUntil(10000) { vm.ui.value.devices.any { it.deviceId == 0x12345678L } }
         rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("标签 12345678"))
@@ -34,12 +34,45 @@ class DemoUiTest {
     }
 
     @Test fun backgroundingStopsForegroundScan() {
-        rule.onNode(isToggleable()).performClick()
+        rule.onNodeWithTag("demo-mode").performClick()
         rule.onNodeWithText("开始扫描").performClick()
         rule.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
         rule.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
         rule.onNodeWithText("开始扫描").assertIsEnabled()
         rule.onNodeWithText("停止扫描").assertIsNotEnabled()
         rule.onNodeWithText("应用进入后台，扫描已停止；返回后请主动开始").assertExists()
+    }
+
+    @Test fun vibrationSwitchSavesImmediatelyAndHasNoStrongRssiEditor() {
+        val vm = rule.runOnIdle { ViewModelProvider(rule.activity)[DeviceViewModel::class.java] }
+        rule.onNodeWithTag("demo-mode").performClick()
+        rule.onNodeWithText("开始扫描").performClick()
+        rule.waitUntil(10000) { vm.ui.value.devices.any { it.deviceId == 0x12345678L } }
+        rule.onNodeWithText("停止扫描").performClick()
+        rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("标签 12345678"))
+        rule.onNodeWithText("标签 12345678").performClick()
+        rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("设备设置与 1 米校准"))
+        rule.onNodeWithText("设备设置与 1 米校准").performClick()
+        rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("near-alert-vibration"))
+        rule.onNodeWithTag("near-alert-vibration").assertIsOn().performClick().assertIsOff()
+        rule.runOnIdle {
+            org.junit.Assert.assertFalse(vm.ui.value.devices.first { it.deviceId == 0x12345678L }.calibrationParameters.nearAlertVibration)
+        }
+        // Only the existing name, path-loss, 1 m calibration and lost-timeout inputs.
+        rule.onAllNodes(hasSetTextAction()).assertCountEquals(4)
+        rule.onNodeWithText("-45 dBm", substring = true).assertDoesNotExist()
+        rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("恢复默认校准参数"))
+        rule.onNodeWithText("恢复默认校准参数").performClick()
+        rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("near-alert-vibration"))
+        rule.onNodeWithTag("near-alert-vibration").assertIsOff()
+        rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("返回"))
+        rule.onNodeWithText("返回").performClick()
+        rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("设备设置与 1 米校准"))
+        rule.onNodeWithText("设备设置与 1 米校准").performClick()
+        rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("near-alert-vibration"))
+        rule.onNodeWithTag("near-alert-vibration").assertIsOff()
+        rule.activityRule.scenario.recreate()
+        rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("near-alert-vibration"))
+        rule.onNodeWithTag("near-alert-vibration").assertIsOff()
     }
 }

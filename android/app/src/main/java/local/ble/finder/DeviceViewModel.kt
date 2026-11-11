@@ -24,6 +24,7 @@ data class FinderUiState(
     val message: String = "点击开始扫描，查找附近兼容标签",
     val calibrationDeviceId: Long? = null,
     val calibrationSeconds: Int = 0,
+    val veryStrongSignal: Boolean = false,
 )
 
 class DeviceViewModel(application: Application) : AndroidViewModel(application) {
@@ -39,6 +40,10 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     private val demoScanner = DemoSupport.create()
     private var scanner: BleScanner = realScanner
     private var scanStartedMs = 0L
+    private var scanGeneration = 0L
+    private var foreground = false
+    private var findDeviceId: Long? = null
+    private val findSession = FindSessionController(HapticFeedbackController(AndroidHapticDevice(application)))
     private var collector: CalibrationCollector? = null
     private val _ui = MutableStateFlow(FinderUiState())
     val ui = _ui.asStateFlow()
@@ -69,27 +74,51 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
         refresh()
     }
     fun start() {
-        if (_ui.value.scanning) return
+        if (_ui.value.scanning || !foreground) return
         scanStartedMs = SystemClock.elapsedRealtime()
+        val generation = ++scanGeneration
         // Publish before start so asynchronous failures can atomically stop this session.
         _ui.value = _ui.value.copy(scanning = true, message = if (_ui.value.demo) "模拟扫描中 · 数据不是实际蓝牙测量" else "正在扫描附近标签（前台，最多 2 分钟）")
+        updateFindContext()
         val failure = scanner.start({ sample ->
-            if (_ui.value.scanning && repository.receive(sample) && _ui.value.calibrationDeviceId == sample.advertisement.deviceId) {
-                collector?.add(sample.rssi, sample.timeMs)
+            val now = SystemClock.elapsedRealtime()
+            if (_ui.value.scanning && foreground && generation == scanGeneration &&
+                sample.timeMs >= scanStartedMs && sample.timeMs <= now && repository.receive(sample)) {
+                if (_ui.value.calibrationDeviceId == sample.advertisement.deviceId) collector?.add(sample.rssi, sample.timeMs)
+                val device = repository.snapshot(now, true).first { it.deviceId == sample.advertisement.deviceId }
+                findSession.onMeasurement(device, sample.timeMs, now)
+                // Keep V1's 1 Hz numeric UI cadence; BLE rate must not drive rendering.
+                // Confirmation still reacts immediately and only to new measurements.
+                val confirmed = findSession.isVeryStrong
+                if (_ui.value.veryStrongSignal != confirmed) _ui.value = _ui.value.copy(veryStrongSignal = confirmed)
             }
-        }, { error -> stop(error) })
+        }, { error -> if (generation == scanGeneration) stop(error) })
         if (failure != null) stop(failure)
         refresh()
     }
     fun stop(message: String = "扫描已停止；显示的最后 RSSI 不是实时读数") {
+        scanGeneration++
         scanner.stop()
         val wasCalibrating = collector != null
         collector = null
         repository.resetSignals()
         _ui.value = _ui.value.copy(scanning = false, calibrationDeviceId = null, calibrationSeconds = 0,
             message = if (wasCalibrating) "$message；校准已取消，未保存" else message)
+        updateFindContext()
         refresh()
     }
+    fun setForeground(active: Boolean) {
+        foreground = active
+        updateFindContext()
+        if (!active) stop("应用进入后台，扫描已停止；返回后请主动开始")
+    }
+    fun setFindDevice(id: Long?) {
+        findDeviceId = id
+        updateFindContext()
+        refresh()
+    }
+    private fun updateFindContext() = findSession.updateContext(findDeviceId, _ui.value.scanning,
+        foreground, _ui.value.demo, SystemClock.elapsedRealtime())
     fun setDemo(enabled: Boolean) {
         if (!DemoSupport.available || enabled == _ui.value.demo) return
         stop()
@@ -101,11 +130,19 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     fun notify(message: String) { _ui.value = _ui.value.copy(message = message) }
     fun save(id: Long, name: String, n: String, reference: String, timeout: String) {
         if (collector != null) { notify("请先等待校准完成或停止扫描"); return }
-        val settings = DeviceSettings(name.trim(), reference.toDoubleOrNull(), n.toDoubleOrNull() ?: Double.NaN,
-            timeout.toLongOrNull()?.takeIf { it in 5..120 }?.times(1000) ?: 0)
+        val old = _ui.value.devices.firstOrNull { it.deviceId == id }?.calibrationParameters ?: return
+        val settings = old.copy(name = name.trim(), rssiAt1m = reference.toDoubleOrNull(), pathLoss = n.toDoubleOrNull() ?: Double.NaN,
+            lostTimeoutMs = timeout.toLongOrNull()?.takeIf { it in 5..120 }?.times(1000) ?: 0)
         if (reference.isNotBlank() && settings.rssiAt1m == null || !repository.update(id, settings)) {
             notify("参数无效：名称最多 40 字，RSSI -100..-20，n 1..6，失联阈值 5..120 秒")
         } else { notify("已保存本地设置"); refresh() }
+    }
+    fun setNearAlertVibration(id: Long, enabled: Boolean) {
+        val settings = _ui.value.devices.firstOrNull { it.deviceId == id }?.calibrationParameters ?: return
+        if (repository.update(id, settings.copy(nearAlertVibration = enabled))) {
+            if (findDeviceId == id) findSession.updateVibrationEnabled(enabled)
+            refresh()
+        }
     }
     fun calibrate(id: Long) {
         if (!_ui.value.scanning) { notify("请先开始扫描，再将手机固定在距标签约 1 米处"); return }
@@ -127,16 +164,22 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     fun reset(id: Long) {
         if (collector != null) { notify("请先停止扫描以取消校准"); return }
         val settings = _ui.value.devices.firstOrNull { it.deviceId == id }?.calibrationParameters ?: return
-        repository.update(id, DeviceSettings(name = settings.name)); notify("已恢复广播参考值、n=2.2、失联阈值 10 秒"); refresh()
+        repository.update(id, DeviceSettings(name = settings.name, nearAlertVibration = settings.nearAlertVibration))
+        notify("已恢复广播参考值、n=2.2、失联阈值 10 秒"); refresh()
     }
     fun forget(id: Long) {
+        if (findDeviceId == id) setFindDevice(null)
         if (_ui.value.calibrationDeviceId == id) { collector = null; _ui.value = _ui.value.copy(calibrationDeviceId = null, calibrationSeconds = 0) }
         repository.forget(id); notify("本地记录已删除；若标签仍在广播，下次扫描会重新发现"); refresh()
     }
     private fun refresh() {
-        _ui.value = _ui.value.copy(devices = repository.snapshot(SystemClock.elapsedRealtime(), _ui.value.scanning))
+        val now = SystemClock.elapsedRealtime()
+        val devices = repository.snapshot(now, _ui.value.scanning)
+        findSession.refresh(devices.firstOrNull { it.deviceId == findDeviceId }, now)
+        _ui.value = _ui.value.copy(devices = devices, veryStrongSignal = findSession.isVeryStrong)
     }
     override fun onCleared() {
+        findSession.updateContext(null, false, false, _ui.value.demo, SystemClock.elapsedRealtime())
         realScanner.stop(); demoScanner?.stop()
         getApplication<Application>().unregisterReceiver(bluetoothReceiver)
     }

@@ -5,6 +5,7 @@ data class DeviceSettings(
     val rssiAt1m: Double? = null,
     val pathLoss: Double = 2.2,
     val lostTimeoutMs: Long = 10000,
+    val nearAlertVibration: Boolean = true,
 ) {
     fun isValid() = name.length <= 40 && (rssiAt1m == null || rssiAt1m.isFinite() && rssiAt1m in -100.0..-20.0) &&
         pathLoss.isFinite() && pathLoss in 1.0..6.0 && lostTimeoutMs in 5000..120000
@@ -52,7 +53,8 @@ class DeviceRepository(private val store: DeviceStore) {
         val id = sample.advertisement.deviceId
         if (id !in 1..0xffffffffL) return false
         val entry = devices[id]
-        if (entry?.sample != null && sample.timeMs < entry.sample!!.timeMs) return false
+        // Re-delivery of one measurement must not pump the median/EMA or refresh identity data.
+        if (entry?.sample != null && sample.timeMs <= entry.sample!!.timeMs) return false
         val target = entry ?: Entry(DeviceSettings()).also { devices[id] = it; persist() }
         if (!target.estimator.add(sample.rssi, sample.timeMs)) return false
         target.sample = sample
