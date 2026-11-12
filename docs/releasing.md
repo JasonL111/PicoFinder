@@ -52,7 +52,7 @@ For a local signing check, export `PICO_RELEASE_KEYSTORE_PATH`, `PICO_RELEASE_ST
 
 4. Follow [PicoFinder CI and versioned release](https://github.com/JasonL111/PicoFinder/actions/workflows/ci.yml).
    A pushed tag must exactly match `v` + `versionName`. The signed binary is inspected for version,
-   application ID, min/target SDK, non-debuggable Release variant and valid v2 signature before packaging.
+   application ID, min/target SDK, non-debuggable Release variant and a valid v2 or v3 signature before packaging.
 5. Publication first creates a draft, verifies the tag still points to the artifact commit, uploads all
    three files and compares their server-side SHA-256 digests. Only then is the release made public.
 

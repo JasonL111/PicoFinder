@@ -71,8 +71,11 @@ def inspect_apk(apk, context):
     sdk = Path(os.environ['ANDROID_HOME']) / 'build-tools' / '36.0.0'
     signature = subprocess.check_output([str(sdk / 'apksigner'), 'verify', '--verbose',
                                          '--print-certs', str(apk)], text=True)
-    if 'Verified using v2 scheme (APK Signature Scheme v2): true' not in signature:
-        raise ValueError('APK must have a valid v2 signature')
+    # apksigner reports the scheme selected for the APK's minSdk. With v3 signing
+    # and minSdk 31, v3 is verified while the v2 output can legitimately be false.
+    if not any(f'Verified using v{scheme} scheme (APK Signature Scheme v{scheme}): true' in signature
+               for scheme in (2, 3)):
+        raise ValueError('APK must have a valid v2 or v3 signature')
     certificate = re.search(r'Signer #1 certificate SHA-256 digest: ([0-9a-f]{64})', signature)
     if certificate is None:
         raise ValueError('Missing signing certificate fingerprint')

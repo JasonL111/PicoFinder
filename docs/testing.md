@@ -16,7 +16,10 @@ core 唯一改动是将校准错误中文字符串换为 `CalibrationError` 枚�
 | Python 发布机制 | 18 通过 | Fake GitHub CLI；含已发布版本不可覆盖、草稿、移动 tag、篡改和签名缺失 |
 | 中英文资源校验 | 3 通过 | 键 / 格式参数、默认英文、Kotlin 无中文 UI 字面量、语言和图标引用 |
 | Kotlin core | 23 通过 | 包含固定 −45 / −51 dBm、新鲜样本、冷却与 V1 回归 |
-| App 单元测试、双变体 APK、双变体 lint | 最终构建验证中 | 未配置密钥时 Release 应为未签名输出 |
+| App 单元测试 | 15 通过 | 会话、Fake 触感、旧设置兼容及持久化 |
+| Debug / 未签名 Release / UI test APK | 构建通过 | 1.0.0 / 1000000，真实 APK 版本及签名检查 |
+| lintDebug / lintRelease | 均通过，0 问题 | 无新增 baseline，保留 warningsAsErrors |
+| 临时密钥 Release 签名冒烟 | 通过 | 实际签名脚本 + SDK 校验 v3；测试私钥和已签测试 APK 已删除，不是正式签名交付 |
 | API31 界面 / 本地化 / 原生图标 | 待执行 | 使用无 KVM 软件模拟器，不代表真机 |
 | 真机 BLE、马达、厂商启动器、正式签名升级 | 未运行 | 环境无物理手机 / Pico，正式密钥由维护者配置 |
 
@@ -42,6 +45,13 @@ adb shell am instrument -w -r local.ble.finder.test/androidx.test.runner.Android
 首轮 lint 发现 API33 语言声明、中文无用复数、Compose Configuration 读取和图标资源问题；
 均修正资源或测试实现，不添加 baseline，不关闭 `warningsAsErrors`。图标移动目录后的增量
 资源缓存还曾导致资源未找到，随后清理 App 构建目录重建。失败轮次不计为通过。
+Release lint 另发现两条仅用于模拟截图的文案，已移入 Debug 源集。
+实际临时签名检查发现 apksigner 在 minSdk31 / v3 包中输出 v2=false、v3=true；
+制品检查现接受有效 v2 或 v3，仍拒绝无现代签名的包，并增加对应回归断言。
+签名冒烟仅使用一次性测试私钥，正式 Secrets 仍未配置；未创建实际 Release。
+最终全量构建 `BUILD SUCCESSFUL in 3m 55s`，日志 `build-final-verified.log`；临时签名构建 44 s。
+PR 初次资源修复后的 [Actions run 43172306768](https://github.com/JasonL111/PicoFinder/actions/runs/43172306768)
+实际通过并上传 Debug artifact；最终提交以 PR #3 Checks 为准。
 原始日志、截图和兼容性审计保存在工作环境 `/workspace/artifacts/formal-1.0/`。
 
 ### 发布前人工验收

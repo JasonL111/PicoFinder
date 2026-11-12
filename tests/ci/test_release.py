@@ -66,9 +66,13 @@ class MetadataTests(unittest.TestCase):
     def test_manifest_variant_version_and_signature_are_verified(self):
         context = release.metadata(environment())
         signature = 'Verified using v2 scheme (APK Signature Scheme v2): true\nSigner #1 certificate SHA-256 digest: ' + 'c' * 64
+        v3_signature = ('Verified using v2 scheme (APK Signature Scheme v2): false\n'
+                        'Verified using v3 scheme (APK Signature Scheme v3): true\n'
+                        'Signer #1 certificate SHA-256 digest: ' + 'c' * 64)
         manifest = "package: name='local.ble.finder' versionCode='1000000' versionName='1.0.0'\nsdkVersion:'31'\ntargetSdkVersion:'36'\n"
         with patch.dict(os.environ, ANDROID_HOME='/sdk'):
             for signing, body, valid in [(signature, manifest, True),
+                                          (v3_signature, manifest, True),
                                           (signature, manifest + 'application-debuggable\n', False),
                                           (signature, manifest.replace('1.0.0', '1.2.0'), False),
                                           (signature.replace(': true', ': false'), manifest, False)]:
