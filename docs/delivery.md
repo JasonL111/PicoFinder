@@ -1,74 +1,51 @@
-# GitHub Actions 自动交付 APK
+# 下载、安装与版本核对
 
-你不需要自己编译 Android。直接打开：
+正式下载入口为 [Releases](https://github.com/JasonL111/PicoFinder/releases)。
+从 **1.0.0** 开始，正式 APK 仅在固定密钥签名的版本 tag 工作流成功后上传。
+维护者发布步骤见 [releasing.md](releasing.md)。旧 `dev-latest` 保留为历史开发产物，不代表当前正式版本。
 
-- [最新测试版 APK](https://github.com/JasonL111/PicoFinder/releases/download/dev-latest/local-ble-finder.apk)
-- [发布说明、校验和与构建信息](https://github.com/JasonL111/PicoFinder/releases/tag/dev-latest)
-- [Actions 构建状态](https://github.com/JasonL111/PicoFinder/actions/workflows/ci.yml)
+## 普通用户
 
-在 Android 12+ 手机上下载 APK，按系统提示允许浏览器或文件管理器“安装未知来源应用”，
-然后安装。若系统阻止下载，先从发布页 Assets 点击 `local-ble-finder.apk`。
-App 运行不需要互联网；发布/下载由 GitHub 承担。
+1. 在 [最新正式版](https://github.com/JasonL111/PicoFinder/releases/latest)选择所需版本；
+   [v1.0.0](https://github.com/JasonL111/PicoFinder/releases/tag/v1.0.0) 将在签名工作流成功后出现。
+2. 从 Assets 下载 `picofinder-1.0.0.apk`。Android 12+ 才能安装，无需 Android Studio。
+3. 按系统提示允许浏览器或文件管理器安装此 APK。应用显示名为 **PicoFinder**。
+4. 为 App 授予附近设备和定位权限，打开蓝牙；标签无需与手机配对。
 
-## 触发方式
+每个正式版本包含版本化 APK、`SHA256SUMS`、`build-info.json`。
+元数据记录完整提交、构建地址、Android 版本、构建类型、APK 和签名证书 SHA-256。
+下载全部文件后执行 `sha256sum --check SHA256SUMS`；Windows 可使用
+`Get-FileHash .\picofinder-1.0.0.apk -Algorithm SHA256` 对照校验和。
+校验和确认下载完整性，签名证书决定是否能覆盖升级；两者用途不同。
 
-| 操作 | 自动结果 |
+## 开发预览与正式版的区别
+
+| 触发 | 结果 |
 |---|---|
-| 推送 main | 校验并构建，成功后更新 `dev-latest` 预发布测试版，下载链接保持不变 |
-| Actions → Android CI and APK delivery → Run workflow，选择 main | 手动触发同一完整交付流程，无需本地编译 |
-| 推送 `v1.2.3` tag | 校验并发布该版本的归档测试 APK；已发布的版本资产不会被覆盖 |
-| 推送 `v1.2.3-rc.1` tag | 发布对应版本的预发布测试 APK |
-| Pull Request 或其他分支 | 只测试/构建并保存 Actions artifact，不发布 Release |
+| 普通分支 / main push、PR、手动 Run workflow | 测试、双变体构建、lint；Actions 中的 `picofinder-debug` artifact |
+| 推送与 `version.properties` 一致的稳定 tag，如 `v1.0.0` | 所有检查通过后，使用维护者密钥签名并发布一个新 Release |
+| 不匹配的版本 tag | 校验失败，不发布 |
+| 手动运行，即使选择 tag | 只产生 Debug artifact，不发布 |
+| 重跑已发布版本 | 不覆盖既有 Release、资产或 tag |
 
-所有发布依次等待 Python 协议与交付测试、Kotlin 单元测试、Android lint、Debug APK
-和 UI 测试 APK 构建成功。CI 构建 UI 测试包，不自动运行实机测试；不能把发布成功当成
-真实 BLE 验收通过。main 构建串行发布，重跑旧提交不会覆盖 main 的新版本。
+Actions artifact 必须打开**对应提交**的成功 run，下载并解压 `picofinder-debug`。
+其中 APK 为 `picofinder-1.0.0-debug.apk`；它与正式版版本名相同，但元数据明确标为 Debug，
+仅 Debug 提供模拟模式。Actions 成功不等于真机 BLE 或振动已通过验收。
 
-无需配置 Repository Secrets、Android 签名密钥或个人 GitHub token。发布 job 单独声明
-`contents: write`，使用 GitHub 自动提供的 `GITHUB_TOKEN`；其他 job 只有读取权限。
-PR 不进入发布 job。当前发布的是 **Debug 测试版**，保留有明显标识的模拟模式。
+## 升级与本机数据
 
-## 文件与版本
+应用 ID 继续为 `local.ble.finder`，已有存储格式、Device ID、名称、校准值及振动开关保留。
+Android 只有在应用签名兼容且版本号允许时才能直接覆盖安装并保留数据。
 
-每次发布包含：
+旧 CI 每次生成 Debug 密钥，新正式版将使用长期固定的 Release 密钥，两者通常不兼容。
+如提示签名冲突，先手工记录各标签名称、参考 RSSI、n、超时和振动开关，卸载旧 Debug 版再安装。
+**卸载会删除本机设置，App 不提供导出或云端恢复。** 今后正式版应始终使用同一密钥和递增 versionCode。
 
-- `local-ble-finder.apk`：可安装的测试版。
-- `SHA256SUMS`：APK 和元数据的 SHA-256。
-- `build-info.json`：源码提交、构建 URL、版本、构建类型和 APK 哈希。
+## 发布失败
 
-主分支版本名为 `dev.<Actions run number>`；版本 tag 使用去掉 `v` 的版本名。
-versionCode 为 `1000 + Actions run number`。源码中的本地默认版本不会因 CI 改写。
-下载后的包与元数据在发布前再次校验，并绑定当前 workflow 的提交与版本，防止上传错包。
-可用 `sha256sum --check SHA256SUMS` 检查下载；Windows 可用
-`Get-FileHash .\local-ble-finder.apk -Algorithm SHA256` 与文件中的值比较。
+缺少签名 Secrets 会在签名步骤立即失败，不会降级为 Debug 并发布。普通 CI 无需这些 Secrets。
+发布先创建草稿，上传并核对三个文件的服务端 digest，成功后才公开。
+同一 run 重试可以补齐草稿中缺失且不冲突的文件；若草稿已有不同内容，应人工检查，不能覆盖。
+HTTP 403、tag 移动、版本或哈希不一致都会停止发布。维护者操作见 [releasing.md](releasing.md)。
 
-## 测试版签名与升级
-
-首次安装无需任何签名配置。GitHub runner 会生成普通 Android debug 签名，**不同构建
-可能使用不同签名**。若覆盖安装报签名不兼容，先记录名称、RSSI 参考值、n 和超时参数，
-卸载旧测试版后重装；卸载会清空本机设置。
-
-不把私钥提交到仓库，也不把签名密钥放进可由 PR 读取的共享缓存。需要长期直接覆盖
-升级、保留设置或正式分发时，再配置由 GitHub Secrets 保管的固定 release 签名；当前
-无需配置的测试版流程不声称具备正式版签名稳定性。
-
-## 开发者发版本
-
-一般只需推送 main。需要保留一个版本时：
-
-```bash
-git tag v1.0.0
-git push origin v1.0.0
-```
-
-不要删除重建已发布版本 tag；修改后使用新 tag。`dev-latest` 是唯一有意移动的测试
-标签，不用于固定源码版本。失败时到 Actions 查看失败步骤；失败流程不会被标记为
-已成功发布的新版本。
-
-此前 CI 的失败点是 `android-actions/setup-android@v3` 初始化 SDK，尚未进入 Gradle。
-当前流程固定 Ubuntu 24.04、JDK21、校验后的 Android CLI19、SDK36 / Build Tools36，
-不再请求已废弃的 `tools` 包。所有下载保留 TLS 和文件校验。
-
-项目固定 SDK36 作为已验证的 V1 基线。联网 runner 的 `OldTargetApi`（建议追随最新
-SDK）保留为信息提示，避免 SDK 发布日改变未修改代码的结果；其余 lint 仍使用
-`warningsAsErrors`，包括实际 API 兼容性和过期目标 SDK 检查。
+App 本身没有 Internet 权限、不使用后端；下载和发布由 GitHub 提供。

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="simulated_data">Controlled simulated data</string>
+    <string name="demo_screenshot_caption">PicoFinder %1$s · Controlled simulated data</string>
+</resources>

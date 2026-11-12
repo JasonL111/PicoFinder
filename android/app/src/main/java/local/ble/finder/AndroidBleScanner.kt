@@ -35,18 +35,18 @@ class AndroidBleScanner(private val context: Context) : BleScanner {
     @SuppressLint("MissingPermission") // Every entry verifies runtime permissions; revocation is caught.
     override fun start(onSample: (ScanSample) -> Unit, onError: (String) -> Unit): String? {
         if (callback != null) return null
-        if (!context.packageManager.hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) return "此设备不支持 BLE，请使用真实 BLE 手机或调试演示模式"
-        if (!hasPermissions(context)) return "需要附近设备与精确位置权限；拒绝后可在系统设置中授权"
+        if (!context.packageManager.hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) return context.getString(R.string.ble_unsupported)
+        if (!hasPermissions(context)) return context.getString(R.string.ble_permissions_required)
         try {
             val adapter = context.getSystemService(BluetoothManager::class.java)?.adapter
-                ?: return "没有可用的蓝牙硬件"
-            if (!adapter.isEnabled) return "蓝牙已关闭，请点击开启蓝牙"
+                ?: return context.getString(R.string.ble_no_hardware)
+            if (!adapter.isEnabled) return context.getString(R.string.ble_disabled)
             if (context.getSystemService(LocationManager::class.java)?.isLocationEnabled != true) {
-                return "请开启系统位置开关。本应用仅估算 BLE 相对距离，不读取 GPS"
+                return context.getString(R.string.ble_location_disabled)
             }
             val remaining = nextStartMs - SystemClock.elapsedRealtime()
-            if (remaining > 0) return "请等待 ${(remaining + 999) / 1000} 秒再开始，避免系统扫描节流"
-            val nativeScanner = adapter.bluetoothLeScanner ?: return "蓝牙扫描器暂不可用"
+            if (remaining > 0) return context.getString(R.string.ble_wait, (remaining + 999) / 1000)
+            val nativeScanner = adapter.bluetoothLeScanner ?: return context.getString(R.string.ble_scanner_unavailable)
             val session = object : ScanCallback() {
                 override fun onScanResult(callbackType: Int, result: ScanResult) {
                     val ad = result.scanRecord?.bytes?.let(AdvertisementDecoder::decode) ?: return
@@ -62,13 +62,13 @@ class AndroidBleScanner(private val context: Context) : BleScanner {
                         if (callback !== this) return@post
                         stop()
                         onError(when (errorCode) {
-                            SCAN_FAILED_ALREADY_STARTED -> "系统报告扫描已在运行，请停止后稍候重试"
-                            SCAN_FAILED_APPLICATION_REGISTRATION_FAILED -> "扫描注册失败，请稍候重试或重开蓝牙"
-                            SCAN_FAILED_FEATURE_UNSUPPORTED -> "系统不支持此 BLE 扫描功能"
-                            SCAN_FAILED_INTERNAL_ERROR -> "蓝牙内部错误，请稍候重试"
-                            SCAN_FAILED_OUT_OF_HARDWARE_RESOURCES -> "蓝牙扫描资源不足，请关闭其他扫描应用"
-                            SCAN_FAILED_SCANNING_TOO_FREQUENTLY -> "系统已限制扫描频率，请等待至少 30 秒再重试"
-                            else -> "扫描失败，错误代码 $errorCode"
+                            SCAN_FAILED_ALREADY_STARTED -> context.getString(R.string.ble_already_started)
+                            SCAN_FAILED_APPLICATION_REGISTRATION_FAILED -> context.getString(R.string.ble_registration_failed)
+                            SCAN_FAILED_FEATURE_UNSUPPORTED -> context.getString(R.string.ble_feature_unsupported)
+                            SCAN_FAILED_INTERNAL_ERROR -> context.getString(R.string.ble_internal_error)
+                            SCAN_FAILED_OUT_OF_HARDWARE_RESOURCES -> context.getString(R.string.ble_resources_exhausted)
+                            SCAN_FAILED_SCANNING_TOO_FREQUENTLY -> context.getString(R.string.ble_throttled)
+                            else -> context.getString(R.string.ble_scan_failed, errorCode)
                         })
                     }
                 }
@@ -84,10 +84,10 @@ class AndroidBleScanner(private val context: Context) : BleScanner {
             return null
         } catch (_: SecurityException) {
             stop()
-            return "蓝牙权限已撤销，请重新授权"
+            return context.getString(R.string.ble_permission_revoked)
         } catch (_: IllegalStateException) {
             stop()
-            return "蓝牙状态已改变，请重新开启后扫描"
+            return context.getString(R.string.ble_state_changed)
         }
     }
 

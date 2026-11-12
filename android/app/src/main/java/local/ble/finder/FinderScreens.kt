@@ -27,6 +27,8 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -78,23 +80,23 @@ internal fun ScanControls(ui: FinderUiState, onStart: () -> Unit, onStop: () -> 
                 else MaterialTheme.colorScheme.onSurfaceVariant, motionEnabled)
             Icon(FinderIcons.Search, contentDescription = null, tint = color, modifier = Modifier.size(22.dp))
             Column(Modifier.weight(1f)) {
-                SoftStateText(if (ui.scanning) "正在扫描" else "扫描已停止", motionEnabled,
+                SoftStateText(if (ui.scanning) stringResource(R.string.scan_active) else stringResource(R.string.scan_stopped), motionEnabled,
                     modifier = Modifier.testTag("scan-status"), color = color)
-                Text(if (ui.scanning) "仅在前台 · 最长 2 分钟" else "已保留最后发现的信息",
+                Text(if (ui.scanning) stringResource(R.string.scan_foreground_limit) else stringResource(R.string.scan_retained),
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        if (!compact || !ui.scanning) Text(ui.message, style = MaterialTheme.typography.bodySmall,
+        if (!compact || !ui.scanning) Text(ui.message.asString(), style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
-        if (ui.calibrationDeviceId != null) Text("1 米校准：还需 %d 秒".format(ui.calibrationSeconds),
+        if (ui.calibrationDeviceId != null) Text(stringResource(R.string.calibration_remaining, ui.calibrationSeconds),
             color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyMedium)
         if (compact) {
-            if (ui.scanning) OutlinedButton(onClick = onStop, modifier = Modifier.fillMaxWidth()) { Text("停止扫描") }
-            else Button(onClick = onStart, modifier = Modifier.fillMaxWidth()) { Text("开始扫描") }
+            if (ui.scanning) OutlinedButton(onClick = onStop, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.stop_scan)) }
+            else Button(onClick = onStart, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.start_scan)) }
         } else {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(onClick = onStart, enabled = !ui.scanning, modifier = Modifier.weight(1f)) { Text("开始扫描") }
-                OutlinedButton(onClick = onStop, enabled = ui.scanning, modifier = Modifier.weight(1f)) { Text("停止扫描") }
+                Button(onClick = onStart, enabled = !ui.scanning, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.start_scan)) }
+                OutlinedButton(onClick = onStop, enabled = ui.scanning, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.stop_scan)) }
             }
         }
     }
@@ -108,30 +110,31 @@ internal fun DeviceListPage(ui: FinderUiState, motionEnabled: Boolean, onSelect:
         verticalArrangement = Arrangement.spacedBy(16.dp),
         contentPadding = PaddingValues(FinderStyle.pagePadding)) {
         item {
-            Text("找回身边的小物件", style = MaterialTheme.typography.headlineSmall)
-            Text("选择一个标签，慢慢走动，观察信号的变化。",
+            Text(stringResource(R.string.list_title), style = MaterialTheme.typography.headlineSmall)
+            Text(stringResource(R.string.list_description),
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 8.dp))
         }
         item { ScanControls(ui, onStart, onStop, motionEnabled) }
         if (DemoSupport.available) item {
+            val demoLabel = stringResource(R.string.demo_toggle)
             Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Column(Modifier.weight(1f)) {
-                    Text("调试演示（虚拟数据）", style = MaterialTheme.typography.labelLarge)
-                    Text("仅预览界面，不触发真实振动", style = MaterialTheme.typography.bodySmall,
+                    Text(stringResource(R.string.demo_toggle), style = MaterialTheme.typography.labelLarge)
+                    Text(stringResource(R.string.demo_description), style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Switch(ui.demo, onDemo, modifier = Modifier.testTag("demo-mode")
                     .semantics {
-                        contentDescription = "调试演示（虚拟数据）"
+                        contentDescription = demoLabel
                     })
             }
         }
         item {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("附近与已保存的标签", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                Text("%d 个".format(ui.devices.size), style = MaterialTheme.typography.labelMedium,
+                Text(stringResource(R.string.list_tags), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Text(pluralStringResource(R.plurals.device_count, ui.devices.size, ui.devices.size), style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
@@ -139,8 +142,8 @@ internal fun DeviceListPage(ui: FinderUiState, motionEnabled: Boolean, onSelect:
             FinderCard {
                 Icon(FinderIcons.Tag, contentDescription = null, tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(32.dp))
-                Text("还没有发现兼容标签", style = MaterialTheme.typography.titleMedium)
-                Text("给 Pico 2 W 接上 USB 电源，授予权限并开始扫描。标签无需出现在系统蓝牙配对列表中。",
+                Text(stringResource(R.string.no_tags_title), style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.no_tags_description),
                     style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
@@ -153,7 +156,7 @@ internal fun DeviceListPage(ui: FinderUiState, motionEnabled: Boolean, onSelect:
         }
         item { SignalCaution() }
         item {
-            Text("PicoFinder · " + BuildConfig.VERSION_NAME + "（" + BuildConfig.VERSION_CODE + "）",
+            Text(stringResource(R.string.app_build, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.testTag("list-installed-version"))
         }
@@ -173,14 +176,14 @@ internal fun DeviceListCard(device: DeviceState, motionEnabled: Boolean, onClick
                 Icon(FinderIcons.Tag, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(device.deviceName, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(device.localizedName(), style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 // Text owns line measurement, including nonlinear system font scaling.
                 SoftStateText(statusText(device.deviceStatus), motionEnabled,
                     minLines = if (LocalDensity.current.fontScale > 1.35f) 3 else 2)
-                Text(device.rssi?.let { "末次 $it dBm" } ?: "等待首次广播",
+                Text(device.rssi?.let { stringResource(R.string.last_rssi, it) } ?: stringResource(R.string.waiting_first_packet),
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Icon(FinderIcons.Next, contentDescription = "查找此标签", tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            Icon(FinderIcons.Next, contentDescription = stringResource(R.string.find_this_tag), tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(20.dp))
         }
     }
@@ -189,13 +192,13 @@ internal fun DeviceListCard(device: DeviceState, motionEnabled: Boolean, onClick
 @Composable
 internal fun PermissionHelp(onBluetooth: () -> Unit, onLocation: () -> Unit, onPermissions: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text("附近设备与位置权限用于蓝牙扫描和粗略估距。不读取 GPS，不联网，不后台扫描。",
+        Text(stringResource(R.string.permission_explanation),
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         // Wrapping is intentional on small screens and with large system text.
         FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            TextButton(onClick = onBluetooth) { Text("开启蓝牙") }
-            TextButton(onClick = onLocation) { Text("位置开关") }
-            TextButton(onClick = onPermissions) { Text("权限设置") }
+            TextButton(onClick = onBluetooth) { Text(stringResource(R.string.enable_bluetooth)) }
+            TextButton(onClick = onLocation) { Text(stringResource(R.string.location_settings)) }
+            TextButton(onClick = onPermissions) { Text(stringResource(R.string.permission_settings)) }
         }
     }
 }
@@ -208,15 +211,15 @@ internal fun FindDevice(device: DeviceState, ui: FinderUiState, motionEnabled: B
         contentPadding = PaddingValues(FinderStyle.pagePadding),
         verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item {
-            Text(device.deviceName, style = MaterialTheme.typography.headlineMedium)
-            Text("ID %08X".format(device.deviceId), style = MaterialTheme.typography.labelMedium,
+            Text(device.localizedName(), style = MaterialTheme.typography.headlineMedium)
+            Text(stringResource(R.string.device_id, device.idHex()), style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
         }
         item { SignalHero(device, ui.scanning, ui.veryStrongSignal, motionEnabled) }
         item { DeviceOverview(device, live, motionEnabled) }
         item {
             OutlinedButton(onClick = onSettings, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
-                Text("设备设置与 1 米校准")
+                Text(stringResource(R.string.open_device_settings))
                 Spacer(Modifier.width(8.dp))
                 Icon(FinderIcons.Next, contentDescription = null, modifier = Modifier.size(18.dp))
             }
@@ -236,13 +239,16 @@ internal fun hasLiveSignal(device: DeviceState, scanning: Boolean) =
 internal fun SignalHero(device: DeviceState, scanning: Boolean, veryStrong: Boolean, motionEnabled: Boolean) {
     val live = hasLiveSignal(device, scanning)
     val confirmed = live && veryStrong
-    val strength = when {
-        !live -> "等待信号"
-        confirmed -> "信号非常强"
-        device.signalBars >= 3 -> "信号较强"
-        device.signalBars == 2 -> "信号中等"
-        else -> "信号较弱"
+    val labels = when {
+        !live -> R.string.strength_waiting to R.string.strength_short_waiting
+        confirmed -> R.string.strength_very_strong to R.string.strength_short_very_strong
+        device.signalBars >= 3 -> R.string.strength_strong to R.string.strength_short_strong
+        device.signalBars == 2 -> R.string.strength_medium to R.string.strength_short_medium
+        else -> R.string.strength_weak to R.string.strength_short_weak
     }
+    val strength = stringResource(labels.first)
+    val shortStrength = stringResource(labels.second)
+    val signalDescription = stringResource(R.string.relative_signal_description, strength)
     val targetColor = when {
         !live -> MaterialTheme.colorScheme.onSurfaceVariant
         confirmed -> MaterialTheme.colorScheme.tertiary
@@ -262,7 +268,7 @@ internal fun SignalHero(device: DeviceState, scanning: Boolean, veryStrong: Bool
                 val diameter = minOf(maxWidth, 248.dp)
                 Box(Modifier.size(diameter).clearAndSetSemantics {
                     testTag = "signal-ring"
-                    contentDescription = "相对蓝牙信号强度，" + strength
+                    contentDescription = signalDescription
                     progressBarRangeInfo = ProgressBarRangeInfo(target, 0f..1f)
                 }.drawBehind {
                     if (halo > 0f) drawCircle(accent.copy(alpha = halo))
@@ -273,9 +279,9 @@ internal fun SignalHero(device: DeviceState, scanning: Boolean, veryStrong: Bool
                         verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Icon(if (confirmed) FinderIcons.Check else FinderIcons.Bluetooth,
                             contentDescription = null, tint = accent, modifier = Modifier.size(28.dp))
-                        Text(if (!live) "等待" else strength.removePrefix("信号"),
+                        Text(shortStrength,
                             style = MaterialTheme.typography.headlineSmall, color = accent, fontWeight = FontWeight.SemiBold)
-                        Text("相对信号", style = MaterialTheme.typography.labelMedium,
+                        Text(stringResource(R.string.relative_signal), style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
@@ -285,7 +291,7 @@ internal fun SignalHero(device: DeviceState, scanning: Boolean, veryStrong: Bool
                     if (fontScale > 1.35f) 3 else if (fontScale > 1.1f) 2 else 1
             }
             Box(Modifier.fillMaxWidth().heightIn(min = messageHeight), contentAlignment = Alignment.Center) {
-                AnimatedContent(if (confirmed) "信号非常强 · 仔细找找附近" else strength,
+                AnimatedContent(if (confirmed) stringResource(R.string.strong_signal_guidance) else strength,
                     transitionSpec = {
                         ((if (motionEnabled) fadeIn(tween(FinderStyle.stateMotionMs)) else EnterTransition.None) togetherWith
                             (if (motionEnabled) fadeOut(tween(120)) else ExitTransition.None)).using(
@@ -310,10 +316,10 @@ private fun TrendFeedback(trend: Trend?, motionEnabled: Boolean) {
         null -> FinderIcons.Search
     }
     val text = when (trend) {
-        Trend.APPROACHING -> "正在靠近 · 信号变强"
-        Trend.AWAY -> "正在远离 · 信号变弱"
-        Trend.STABLE -> "基本不变"
-        null -> "等待新的有效广播"
+        Trend.APPROACHING -> stringResource(R.string.trend_approaching)
+        Trend.AWAY -> stringResource(R.string.trend_away)
+        Trend.STABLE -> stringResource(R.string.trend_stable)
+        null -> stringResource(R.string.trend_waiting)
     }
     Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer,
         modifier = Modifier.fillMaxWidth()) {
@@ -330,16 +336,16 @@ private fun TrendFeedback(trend: Trend?, motionEnabled: Boolean) {
 @Composable
 private fun DeviceOverview(device: DeviceState, live: Boolean, motionEnabled: Boolean) {
     FinderCard {
-        Text("设备概况", style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.device_overview), style = MaterialTheme.typography.titleMedium)
         val distance = device.estimatedDistance.takeIf { live }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("粗略估算", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(distance?.let { approximateDistance(it) } ?: "—", style = MaterialTheme.typography.headlineSmall)
-                if (distance == null) Text("暂无实时距离", style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(R.string.distance_label), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(distance?.let { approximateDistance(it) } ?: stringResource(R.string.value_unavailable), style = MaterialTheme.typography.headlineSmall)
+                if (distance == null) Text(stringResource(R.string.distance_unavailable), style = MaterialTheme.typography.bodySmall)
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("当前状态", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.status_label), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 SoftStateText(statusText(device.deviceStatus), motionEnabled)
             }
         }
@@ -347,7 +353,7 @@ private fun DeviceOverview(device: DeviceState, live: Boolean, motionEnabled: Bo
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(FinderIcons.Clock, contentDescription = null, modifier = Modifier.size(18.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("最后收到：" + lastSeenText(device), style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(R.string.last_received, lastSeenText(device)), style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
@@ -358,21 +364,21 @@ private fun SignalDetails(device: DeviceState, live: Boolean, motionEnabled: Boo
     FinderCard {
         TextButton(onClick = { expanded = !expanded }, modifier = Modifier.fillMaxWidth().testTag("signal-details-toggle"),
             contentPadding = PaddingValues(0.dp)) {
-            Text(if (expanded) "收起信号详情" else "查看信号详情", modifier = Modifier.weight(1f))
+            Text(if (expanded) stringResource(R.string.collapse_details) else stringResource(R.string.expand_details), modifier = Modifier.weight(1f))
             Icon(FinderIcons.Expand, contentDescription = null, modifier = Modifier.size(20.dp))
         }
         AnimatedVisibility(expanded,
             enter = if (motionEnabled) expandVertically(tween(220)) + fadeIn(tween(220)) else EnterTransition.None,
             exit = if (motionEnabled) shrinkVertically(tween(180)) + fadeOut(tween(150)) else ExitTransition.None) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                DetailRow("末次 RSSI", device.rssi?.let { "$it dBm" } ?: "—", "raw-rssi-value")
-                DetailRow("平滑 RSSI", if (live) device.smoothedRssi?.let { "%.1f dBm".format(it) } ?: "—" else "—（非实时）",
+                DetailRow(stringResource(R.string.raw_rssi), device.rssi?.let { stringResource(R.string.rssi_value, it) } ?: stringResource(R.string.value_unavailable), "raw-rssi-value")
+                DetailRow(stringResource(R.string.smoothed_rssi), if (live) device.smoothedRssi?.let { stringResource(R.string.smoothed_rssi_value, it) } ?: stringResource(R.string.value_unavailable) else stringResource(R.string.not_live),
                     "smoothed-rssi-value")
-                DetailRow("1 米参考 RSSI", "%.1f dBm".format(device.calibrationParameters.rssiAt1m
+                DetailRow(stringResource(R.string.reference_rssi), stringResource(R.string.smoothed_rssi_value, device.calibrationParameters.rssiAt1m
                     ?: device.advertisedReference.toDouble()))
-                DetailRow("环境衰减系数 n", device.calibrationParameters.pathLoss.toString())
-                DetailRow("电量", device.batteryLevel?.let { "$it%" } ?: "未知")
-                DetailRow("广播协议", "v%d".format(device.protocolVersion))
+                DetailRow(stringResource(R.string.path_loss), device.calibrationParameters.pathLoss.toString())
+                DetailRow(stringResource(R.string.battery), device.batteryLevel?.let { stringResource(R.string.battery_value, it) } ?: stringResource(R.string.unknown))
+                DetailRow(stringResource(R.string.protocol), stringResource(R.string.protocol_value, device.protocolVersion))
             }
         }
     }
@@ -391,25 +397,28 @@ internal fun SignalCaution() {
     Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Icon(FinderIcons.Info, contentDescription = null, modifier = Modifier.size(16.dp),
             tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text("距离仅供参考。人体、家具和墙壁会影响信号；观察数秒趋势，无法据此判断方向或房间。扫描不到也不能断言物品在室外。",
+        Text(stringResource(R.string.signal_caution),
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
+@Composable
 internal fun statusText(status: DeviceStatus) = when (status) {
-    DeviceStatus.NEVER_SEEN -> "尚未接收"
-    DeviceStatus.PRESENT -> "正常发现"
-    DeviceStatus.WEAK -> "信号弱 / 可能失联"
-    DeviceStatus.LOST -> "已失联"
-    DeviceStatus.SCAN_STOPPED -> "扫描已停止"
+    DeviceStatus.NEVER_SEEN -> stringResource(R.string.status_never_seen)
+    DeviceStatus.PRESENT -> stringResource(R.string.status_present)
+    DeviceStatus.WEAK -> stringResource(R.string.status_weak)
+    DeviceStatus.LOST -> stringResource(R.string.status_lost)
+    DeviceStatus.SCAN_STOPPED -> stringResource(R.string.scan_stopped)
 }
 
+@Composable
 private fun lastSeenText(device: DeviceState) = device.lastSeenWallMs?.let {
-    SimpleDateFormat("HH:mm:ss", Locale.SIMPLIFIED_CHINESE).format(Date(it))
-} ?: "从未接收"
+    SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(it))
+} ?: stringResource(R.string.never_received)
 
+@Composable
 private fun approximateDistance(distance: Double) = when {
-    distance >= 100 -> ">100 米"
-    distance < 0.1 -> "<0.1 米"
-    else -> "约 %.1f 米".format(distance)
+    distance >= 100 -> stringResource(R.string.distance_over_max)
+    distance < 0.1 -> stringResource(R.string.distance_under_min)
+    else -> stringResource(R.string.distance_approx, distance)
 }

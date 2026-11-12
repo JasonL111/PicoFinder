@@ -1,15 +1,15 @@
-name: Android CI and APK delivery
+name: PicoFinder CI and versioned release
 on:
   push:
     branches: ['**']
-    tags: ['v[0-9]*']
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
 
 permissions:
   contents: read
 concurrency:
-  group: android-${{ github.workflow }}-${{ github.ref }}
+  group: picofinder-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -18,7 +18,6 @@ jobs:
     outputs:
       publish: ${{ steps.build.outputs.publish }}
       tag: ${{ steps.build.outputs.tag }}
-      prerelease: ${{ steps.build.outputs.prerelease }}
       version_name: ${{ steps.build.outputs.version_name }}
       version_code: ${{ steps.build.outputs.version_code }}
     steps:
@@ -29,7 +28,7 @@ jobs:
         with:
           python-version: '3.12'
       - id: build
-        name: Resolve APK version and publication channel
+        name: Validate project version and publication event
         run: python tools/ci_release.py metadata
 
   firmware-protocol:
@@ -41,10 +40,11 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
-      - name: Firmware and delivery integrity tests
+      - name: Protocol, localization and release integrity tests
         run: |
           python -m unittest discover -s tests/protocol -v
           python -m unittest discover -s tests/ci -v
+          python -m unittest discover -s tests/localization -v
       - name: Python syntax and whitespace
         run: |
           python -m compileall -q firmware/pico2w tools tests
@@ -68,21 +68,22 @@ jobs:
       - name: Install checksummed Android CLI and SDK 36
         run: bash .github/scripts/setup-android.sh
       - uses: gradle/actions/setup-gradle@v5
-      - name: JVM unit tests, lint, Debug APK and UI test APK
+      - name: JVM tests, both variants, lint and UI test APK
         working-directory: android
         env:
           APK_VERSION_NAME: ${{ needs.metadata.outputs.version_name }}
           APK_VERSION_CODE: ${{ needs.metadata.outputs.version_code }}
         run: bash ../.github/scripts/build-android.sh
-      - name: Verify signature and package downloadable APK
+      - name: Verify and package Debug preview
+        if: needs.metadata.outputs.publish != 'true'
         run: |
-          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose android/app/build/outputs/apk/debug/app-debug.apk
-          python tools/ci_release.py package --apk android/app/build/outputs/apk/debug/app-debug.apk --directory "$RUNNER_TEMP/apk-dist"
-          python tools/ci_release.py validate --directory "$RUNNER_TEMP/apk-dist"
+          python tools/ci_release.py package --apk android/app/build/outputs/apk/debug/app-debug.apk --directory "$RUNNER_TEMP/apk-debug"
+          python tools/ci_release.py validate --directory "$RUNNER_TEMP/apk-debug"
       - uses: actions/upload-artifact@v6
+        if: needs.metadata.outputs.publish != 'true'
         with:
-          name: local-ble-finder-debug
-          path: ${{ runner.temp }}/apk-dist/
+          name: picofinder-debug
+          path: ${{ runner.temp }}/apk-debug/
           if-no-files-found: error
       - uses: actions/upload-artifact@v6
         if: always()
@@ -93,8 +94,46 @@ jobs:
             android/app/build/reports/
             ${{ runner.temp }}/android-build.log
 
-  publish:
+  release:
     needs: [metadata, firmware-protocol, android]
+    if: needs.metadata.outputs.publish == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install Android SDK
+        run: bash .github/scripts/setup-android.sh
+      - uses: gradle/actions/setup-gradle@v5
+      - name: Build with the maintainer release key
+        env:
+          APK_VERSION_NAME: ${{ needs.metadata.outputs.version_name }}
+          APK_VERSION_CODE: ${{ needs.metadata.outputs.version_code }}
+          PICO_RELEASE_KEYSTORE_BASE64: ${{ secrets.PICO_RELEASE_KEYSTORE_BASE64 }}
+          PICO_RELEASE_STORE_PASSWORD: ${{ secrets.PICO_RELEASE_STORE_PASSWORD }}
+          PICO_RELEASE_KEY_ALIAS: ${{ secrets.PICO_RELEASE_KEY_ALIAS }}
+          PICO_RELEASE_KEY_PASSWORD: ${{ secrets.PICO_RELEASE_KEY_PASSWORD }}
+        run: bash .github/scripts/build-release.sh
+      - name: Verify signed Release variant and provenance
+        run: |
+          python tools/ci_release.py package --apk android/app/build/outputs/apk/release/app-release.apk --directory "$RUNNER_TEMP/apk-release"
+          python tools/ci_release.py validate --directory "$RUNNER_TEMP/apk-release"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: picofinder-release
+          path: ${{ runner.temp }}/apk-release/
+          if-no-files-found: error
+
+  publish:
+    needs: [metadata, release]
     if: needs.metadata.outputs.publish == 'true'
     runs-on: ubuntu-24.04
     permissions:
@@ -108,12 +147,10 @@ jobs:
           python-version: '3.12'
       - uses: actions/download-artifact@v7
         with:
-          name: local-ble-finder-debug
-          path: ${{ runner.temp }}/apk-dist/
-      - name: Publish APK to GitHub Releases
+          name: picofinder-release
+          path: ${{ runner.temp }}/apk-release/
+      - name: Publish a new immutable version
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ needs.metadata.outputs.tag }}
-          RELEASE_PRERELEASE: ${{ needs.metadata.outputs.prerelease }}
-          APK_DIRECTORY: ${{ runner.temp }}/apk-dist
+          APK_DIRECTORY: ${{ runner.temp }}/apk-release
         run: bash .github/scripts/publish-apk.sh

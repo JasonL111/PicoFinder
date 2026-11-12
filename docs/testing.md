@@ -1,5 +1,113 @@
 # 验证记录与人工验收
 
+## 1.0.0 正式版准备（2026-11-12）
+
+本次基于 main `ad654a5`，完成品牌、双语资源、图标和版本化签名发布流程；
+本节记录实际完成的软件验证；临时密钥签名测试不代表正式发布。正式安装包的发布状态、
+维护者证书与源码提交以 Releases 中的 `build-info.json` 为准。
+固件、协议、UUID、Device ID、滤波 / 测距 / 趋势、设备存储格式、会话与触感规则保持兼容。
+core 唯一改动是将校准错误中文字符串换为 `CalibrationError` 枚举，由 App 资源翻译；
+样本筛选、时间、数值校准算法和原有成功 / 失败条件没有变化。
+
+### 实际检查
+
+| 检查 | 结果 | 边界 |
+|---|---|---|
+| Python 协议 / 固件模拟 | 9 通过 | 非物理 BLE |
+| Python 发布机制 | 18 通过 | Fake GitHub CLI；含已发布版本不可覆盖、草稿、移动 tag、篡改和签名缺失 |
+| 中英文资源校验 | 3 通过 | 键 / 格式参数、默认英文、Kotlin 无中文 UI 字面量、语言和图标引用 |
+| Kotlin core | 23 通过 | 包含固定 −45 / −51 dBm、新鲜样本、冷却与 V1 回归 |
+| App 单元测试 | 15 通过 | 会话、Fake 触感、旧设置兼容及持久化 |
+| Debug / 未签名 Release / UI test APK | 构建通过 | 1.0.0 / 1000000，真实 APK 版本及签名检查 |
+| lintDebug / lintRelease | 均通过，0 问题 | 无新增 baseline，保留 warningsAsErrors |
+| 临时密钥 Release 签名冒烟 | 通过 | 实际签名脚本 + SDK 校验 v3；测试私钥和已签测试 APK 已删除，不是正式签名交付 |
+| API31 界面 / 本地化 / 原生图标 | 16 个唯一用例均取得通过结果 | 完整轮次 14/16；修正宿主后本地化 4/4，非单轮 16/16 |
+| 真机 BLE、马达、厂商启动器、正式签名升级 | 未运行 | 环境无物理手机 / Pico，正式密钥由维护者配置 |
+
+执行命令：
+
+```bash
+python -m unittest discover -s tests/protocol -v
+python -m unittest discover -s tests/ci -v
+python -m unittest discover -s tests/localization -v
+python -m compileall -q firmware/pico2w tools tests
+git diff --check
+cd android
+./gradlew :core:test :app:testDebugUnitTest :app:assembleDebug :app:assembleRelease :app:lintDebug :app:lintRelease :app:assembleDebugAndroidTest
+# 安装 app-debug.apk 和 app-debug-androidTest.apk 后：
+adb shell am instrument -w -r local.ble.finder.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+新增本地化测试使用生产页面检查英文深色 / 中文浅色、320 dp / 1.5 倍字体、设备列表 / 查找 /
+设置 / 删除弹窗 / 权限文案、保留消息在语言变化后重新解析、自定义名称不翻译、全部校准错误映射。
+图标测试直接渲染 Android drawable：圆 / 圆角方 / 方形 × 浅 / 深背景，并保存实际 PNG 预览。
+截图均为模拟标签或受控状态，不是生成的演示图，不证明 BLE 精度、帧率、耗电或真机触感。
+
+首轮 lint 发现 API33 语言声明、中文无用复数、Compose Configuration 读取和图标资源问题；
+均修正资源或测试实现，不添加 baseline，不关闭 `warningsAsErrors`。图标移动目录后的增量
+资源缓存还曾导致资源未找到，随后清理 App 构建目录重建。失败轮次不计为通过。
+Release lint 另发现两条仅用于模拟截图的文案，已移入 Debug 源集。
+实际临时签名检查发现 apksigner 在 minSdk31 / v3 包中输出 v2=false、v3=true；
+制品检查现接受有效 v2 或 v3，仍拒绝无现代签名的包，并增加对应回归断言。
+签名冒烟仅使用一次性测试私钥，正式 Secrets 仍未配置；未创建实际 Release。
+输入框标签已缩短，范围放在提示文字中，便于大字体阅读；参数校验和输入项数量不变。
+最终排版调整后的全量构建 `BUILD SUCCESSFUL in 4m 33s`，日志 `build-ui-final.log`；临时签名构建 44 s。
+PR 初次资源修复后的 [Actions run 43172306768](https://github.com/JasonL111/PicoFinder/actions/runs/43172306768)
+实际通过并上传 Debug artifact；最终提交以 PR #3 Checks 为准。
+原始日志、截图和兼容性审计保存在工作环境 `/workspace/artifacts/formal-1.0/`。
+
+API31 首次新增用例轮次为 2 通过 / 3 失败。诊断复现发现 Compose 的段落宽度包含空白：
+按钮实际尺寸 110×20 px，段落却保留 264×20 px；实际截图中 Enable Bluetooth 完整显示。
+测试改为核对每行文字边界、完整字符和省略状态，避免把段落空白误认为裁切；失败时仍保存
+截图及尺寸。没有移除可读性断言。首次日志 `ui-localization.log`、诊断 `ui-diagnostic.log`。
+
+完整回归为 **14 通过 / 2 失败，550.620 s**，原始日志 `ui-full.log`。14 个通过用例含
+真实 Activity + Fake Scanner 的发现、导航、停止、后台、开关保存、版本、系统动画设置，
+既有动画 / 状态 / 大字体 / 顺序回归、SharedPreferences 兼容，以及权限 / 校准错误翻译与
+保留消息切换语言。失败均为新增双语弹窗用例：英文截图未区分主页面和 Dialog 两个 root；
+中文测试只覆盖 Compose 局部上下文，原生 Dialog 宿主仍是英文，诊断树实际显示
+`Remove this saved tag?`，因此无法找到中文标题。增加等待没有解决语言配置错误。
+测试现同时设置宿主 Resources 的语言 / 字体并在退出时恢复，确保 API31 原生窗口也使用
+测试配置；该兼容桥仅在测试代码中使用，未修改生产语言逻辑。另增强完整按钮滚动、原生窗口
+等待和 `isDialog()` 截图选择；保留标题可见、全文字符 / 行边界、取消按钮等断言。
+中间复测及诊断失败日志保留，不计作通过。运行环境中断后模拟器被关闭，最后一次仅完成
+test APK 构建、尚未安装 / 执行的命令也没有计作通过；恢复后以 `ui-native-locale.log` 为准。
+
+恢复后完整重跑 **4 个本地化用例，189.735 s，OK (4 tests)**，包含中文浅色 / 英文深色、
+320 dp / 1.5 倍字体页面与原生弹窗、权限 / 校准错误以及消息 / 名称的语言切换。
+12 个未改动用例沿用完整轮次的通过结果，最终覆盖 16 个不同用例；没有把中间失败算作通过。
+原始完整轮次为 `ui-full.log`，最终本地化轮次为 `ui-native-locale.log`，逐用例来源为
+`ui-validation.json`。最终命令：
+
+```bash
+adb shell am instrument -w -r -e class local.ble.finder.LocalizationUiTest local.ble.finder.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+发布测试使用独立的 1.0.0 夹具，不依赖仓库当前版本。另在临时 1.0.1 工程中实际重跑同一
+18 项发布测试并验证 tag 元数据为 1.0.1 / 1000100，避免正常升级版本号后 CI 被旧测试夹具卡住。
+这不是实际发布 1.0.1，也未创建该 tag。
+
+模拟器使用 API31 AOSP x86_64，无 KVM，320 dp 宽；测试内设置 1.5 倍字体并检查浅 / 深主题。
+冷启动曾出现 System UI / 启动器无响应和图形缓冲区异常，重启本地框架后才执行测试。
+`ro.hw_timeout_multiplier=5` 仅用于该软件环境，不打入 APK；关闭系统动画，专门动画用例
+仍使用可控 Compose 时钟验证过渡。它不能用于真机启动时延、帧率或耗电结论。
+18 个冻结生产 / 协议 / 固件文件与 main 基线逐字节相同；校准类归一化错误文案后主体
+逐字节相同，审计 `compatibility-audit.json`。Manifest 权限集合也保持原样。
+本地最终 Debug APK SHA-256：`e5b2038d2d560f145eadcb846acca36d6146ec6a3867a049d4162f4377b2b4ad`。
+CI 使用临时 Debug 密钥，与本地包签名 / 哈希不同，应以对应 run 的元数据为准。
+
+### 发布前人工验收
+
+- [ ] 在手机系统语言英语 / 简体中文之间切换；检查列表、查找、设置、删除弹窗、权限和校准错误。
+- [ ] 浅 / 深主题和大字体下可读、可滚动；在实际启动器与应用抽屉检查图标及主题图标。
+- [ ] 原 Pico 固件直接扫描；名称、校准、振动开关在同签名覆盖安装 / 重启后保留。
+- [ ] 普通信号无振动；极强且稳定后仅短振一次；退出 / 冷却后才可再次提醒。
+- [ ] 切换标签、返回列表、后台、失联、停止扫描及模拟模式均不误振动；关闭开关后视觉仍完整。
+- [ ] 配置并备份正式签名密钥，tag 发布后核对 Assets、校验和、安装版本和签名证书。
+
+以下 V1.2 / V1.1 / V1 记录为历史验证，使用当时的版本号和交付流程；当前发布规则以
+[releasing.md](releasing.md) 为准，不再更新 `dev-latest`。
+
 ## V1.2 验证（2026-11-11）
 
 本次为 Android 视觉层增量升级。对比 V1.1 主分支 `3689d3b`，`android/core/src/main`、

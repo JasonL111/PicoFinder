@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <title>PicoFinder</title>
+  <defs>
+    <linearGradient id="bg" x2="1" y2="1"><stop stop-color="#fff"/><stop offset=".5" stop-color="#eff8fe"/><stop offset="1" stop-color="#dceffc"/></linearGradient>
+    <linearGradient id="outer" x2="1" y2="1"><stop stop-color="#e0f2fc"/><stop offset="1" stop-color="#bee5f5"/></linearGradient>
+    <linearGradient id="middle" x2="1" y2="1"><stop stop-color="#c6eef2"/><stop offset="1" stop-color="#91d7e7"/></linearGradient>
+    <linearGradient id="dot" x2="1" y2="1"><stop stop-color="#62d0d5"/><stop offset="1" stop-color="#009bc3"/></linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="128" fill="url(#bg)"/>
+  <circle cx="256" cy="256" r="194" fill="url(#outer)"/>
+  <circle cx="256" cy="256" r="128" fill="url(#middle)"/>
+  <circle cx="256" cy="256" r="48" fill="url(#dot)"/>
+</svg>

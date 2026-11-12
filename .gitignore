@@ -16,3 +16,7 @@ firmware/pico2w/device_id.txt*
 .env
 *.log
 .DS_Store
+*.jks
+*.keystore
+*.p12
+keystore.properties
