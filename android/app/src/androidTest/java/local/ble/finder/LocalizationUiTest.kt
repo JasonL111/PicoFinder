@@ -56,7 +56,23 @@ class LocalizationUiTest {
         rule.onNodeWithText(value, useUnmergedTree = true)
             .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
         assertTrue("Missing text layout: $value", layouts.isNotEmpty())
-        assertFalse("Text overflow: $value", layouts.any { it.hasVisualOverflow })
+        // Paragraphs can retain the wider measurement constraint even when Text
+        // wraps its width to its glyphs (e.g. 264 px paragraph, 110 px button text).
+        // Check actual lines and visible characters, not that empty paragraph area.
+        val problems = layouts.mapNotNull { layout ->
+            val clipped = (0 until layout.lineCount).any { line ->
+                layout.isLineEllipsized(line) || layout.getLineLeft(line) < -0.5f ||
+                    layout.getLineRight(line) > layout.size.width + 0.5f ||
+                    layout.getLineBottom(line) > layout.size.height + 0.5f
+            }
+            val complete = layout.lineCount > 0 &&
+                layout.getLineEnd(layout.lineCount - 1) == layout.layoutInput.text.length
+            if (clipped || !complete) "size=${layout.size}, lines=${layout.lineCount}, complete=$complete" else null
+        }
+        if (problems.isNotEmpty()) {
+            saveUiScreenshot(rule, "overflow-${value.hashCode()}.png")
+            fail("Text overflow: $value; ${problems.joinToString()}")
+        }
     }
 
     @Test fun retainedMessagesAndNamesResolveAfterLocaleChanges() {

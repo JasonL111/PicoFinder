@@ -202,8 +202,10 @@ internal fun DeviceSettingsPanel(device: DeviceState, calibrating: Boolean, mess
         Text(stringResource(R.string.tag_parameters), style = MaterialTheme.typography.titleMedium)
         FinderCard {
             OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text(stringResource(R.string.setting_name)) },
+                supportingText = { Text(stringResource(R.string.setting_name_hint)) },
                 singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !calibrating)
             OutlinedTextField(value = n, onValueChange = { n = it }, label = { Text(stringResource(R.string.setting_path_loss)) },
+                supportingText = { Text(stringResource(R.string.path_loss_hint)) },
                 singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 modifier = Modifier.fillMaxWidth(), enabled = !calibrating)
             OutlinedTextField(value = reference, onValueChange = { reference = it }, label = { Text(stringResource(R.string.setting_reference)) },
