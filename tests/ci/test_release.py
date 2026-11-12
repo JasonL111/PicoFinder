@@ -126,7 +126,7 @@ class MetadataTests(unittest.TestCase):
 
 
 class PublicationTests(unittest.TestCase):
-    def invoke(self, initial=None, ref='refs/tags/v1.0.0', event='push', tamper=False):
+    def invoke(self, initial=None, ref='refs/tags/v1.0.0', event='push', tamper=False, already_uploaded=False):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d); binary = root / 'bin'; binary.mkdir()
             # Run the actual publication scripts in an isolated fixture project,
@@ -149,6 +149,11 @@ class PublicationTests(unittest.TestCase):
                        RUNNER_TEMP=str(root), GITHUB_STEP_SUMMARY=str(root / 'summary'), APK_DIRECTORY=str(root / 'dist'))
             apk = root / 'input.apk'; apk.write_bytes(b'fixture APK')
             fixture_package(apk, root / 'dist', release.metadata(env))
+            if already_uploaded:
+                saved = json.loads(state.read_text())
+                saved['assets'] = [{'name': file.name, 'digest': 'sha256:' + release.digest(file)}
+                                   for file in sorted((root / 'dist').iterdir())]
+                state.write_text(json.dumps(saved))
             if tamper:
                 (root / 'dist' / release.metadata(env)['apk_name']).write_bytes(b'changed')
             run = subprocess.run(['bash', '.github/scripts/publish-apk.sh'], cwd=root, env=env, text=True, capture_output=True)
@@ -174,6 +179,31 @@ class PublicationTests(unittest.TestCase):
         run, state, _ = self.invoke({'release': True, 'draft': True})
         self.assertEqual(0, run.returncode, run.stderr)
         self.assertTrue(state['published'])
+
+    def test_uploaded_draft_404_by_tag_is_verified_by_id_without_reupload(self):
+        run, state, _ = self.invoke({'release': True, 'draft': True}, already_uploaded=True)
+        self.assertEqual(0, run.returncode, run.stderr)
+        self.assertTrue(state['published'])
+        self.assertFalse(any(c[:2] in (['release', 'create'], ['release', 'upload']) for c in state['calls']))
+        self.assertTrue(any(c[:2] == ['api', 'repos/JasonL111/PicoFinder/releases/7'] for c in state['calls']))
+
+    def test_draft_on_later_release_list_page_can_resume(self):
+        run, state, _ = self.invoke({'release': True, 'draft': True, 'release_page': 2})
+        self.assertEqual(0, run.returncode, run.stderr)
+        self.assertTrue(state['published'])
+        self.assertFalse(any(c[:2] == ['release', 'create'] for c in state['calls']))
+
+    def test_release_list_denial_does_not_create_another_draft(self):
+        run, state, _ = self.invoke({'release': True, 'draft': True, 'denied_release_list': True})
+        self.assertNotEqual(0, run.returncode)
+        self.assertIn('HTTP 403', run.stderr)
+        self.assertFalse(any(c[0] == 'release' for c in state['calls']))
+
+    def test_duplicate_drafts_fail_without_mutation(self):
+        run, state, _ = self.invoke({'release': True, 'draft': True, 'duplicate_draft': True})
+        self.assertNotEqual(0, run.returncode)
+        self.assertIn('Multiple release drafts', run.stderr)
+        self.assertFalse(any(c[0] == 'release' for c in state['calls']))
 
     def test_conflicting_draft_asset_cannot_be_overwritten(self):
         run, state, _ = self.invoke({'release': True, 'draft': True,

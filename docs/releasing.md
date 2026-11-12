@@ -88,6 +88,11 @@ needs a fix, issue a new version. Do not delete/recreate a tag. A same-run retry
 an unpublished draft only when existing file digests match; conflicting drafts stop for manual review.
 An already-public version returns without mutations. A moved tag or source mismatch also stops.
 
+GitHub's release-by-tag endpoint returns published releases and may return 404 for a draft.
+The publisher locates drafts through the authenticated, paginated release list, then verifies
+uploaded assets through the release's numeric ID. A draft 404 is not a reason to move the tag,
+replace an asset or create a duplicate draft.
+
 Branch pushes, PRs and manual dispatches only upload `picofinder-debug` Actions artifacts; selecting a tag
 in Run workflow does not publish. The publish job alone receives `contents: write` and uses `GITHUB_TOKEN`,
 so no personal access token is needed. Missing signing Secrets cannot affect ordinary CI preview builds.
