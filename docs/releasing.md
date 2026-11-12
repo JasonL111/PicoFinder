@@ -6,6 +6,11 @@ The previous `dev-latest` remains historical output. New pushes never move it or
 
 ## One-time signing setup
 
+Android APK signing requires an Android keystore (JKS or PKCS12). OpenPGP secrets such as
+`GPG_PRIVATE_KEY` and `GPG_PASSPHRASE` are for Git/file signatures and cannot directly sign an installable
+APK. Keep those separate from the four Android signing Secrets below. A standalone JDK provides `keytool`;
+Android Studio is not required to create the signing key.
+
 Keep a long-lived Android release key, an encrypted offline backup and its passwords under maintainer
 control. Losing this key prevents compatible future updates. Do not paste private material into issues,
 chat, source files or build logs. Use a separate key from any disposable Debug signing key.
@@ -16,6 +21,11 @@ For example, generate a JKS interactively on a trusted machine (the command prom
 keytool -genkeypair -v -keystore picofinder-release.jks -storetype JKS \
   -alias picofinder -keyalg RSA -keysize 3072 -validity 10000
 ```
+
+The alias in this example is `picofinder`. If you accept the prompt to use the keystore password for
+the key as well, use that same password for both password Secrets. On Windows PowerShell, obtain Base64 with
+`[Convert]::ToBase64String([IO.File]::ReadAllBytes("picofinder-release.jks"))`.
+Copy the result directly into GitHub Secrets, never into chat or an issue.
 
 In repository Settings → Secrets and variables → Actions, configure these **repository Secrets**:
 
@@ -64,6 +74,8 @@ The resulting [v1.0.0 page](https://github.com/JasonL111/PicoFinder/releases/tag
 
 Download/install that exact public asset on a phone and compare checksums and visible version.
 Existing Debug installs may require uninstalling because their signing key differs; see [delivery.md](delivery.md).
+After the first successful publication, update the preparation notices in the READMEs, delivery guide,
+changelog and this document in a follow-up documentation commit. Keep the published tag unchanged.
 
 ## Future versions and reruns
 

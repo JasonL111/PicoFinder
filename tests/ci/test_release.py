@@ -1,6 +1,7 @@
 import importlib.util
 import json
 import os
+import shutil
 from pathlib import Path
 import subprocess
 import sys
@@ -12,6 +13,26 @@ ROOT = Path(__file__).resolve().parents[2]
 spec = importlib.util.spec_from_file_location('ci_release', ROOT / 'tools/ci_release.py')
 release = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(release)
+
+# Keep historical release fixtures stable when the real project advances to
+# 1.0.1 / 1.1.0. Production metadata still reads the real version.properties.
+FIXTURE_VERSION = 'versionName=1.0.0\nversionCode=1000000\n'
+_version_directory = None
+_version_patch = None
+
+
+def setUpModule():
+    global _version_directory, _version_patch
+    _version_directory = tempfile.TemporaryDirectory()
+    root = Path(_version_directory.name)
+    (root / 'version.properties').write_text(FIXTURE_VERSION)
+    _version_patch = patch.object(release, 'ROOT', root)
+    _version_patch.start()
+
+
+def tearDownModule():
+    _version_patch.stop()
+    _version_directory.cleanup()
 
 
 def environment(ref='refs/tags/v1.0.0', event='push'):
@@ -108,6 +129,16 @@ class PublicationTests(unittest.TestCase):
     def invoke(self, initial=None, ref='refs/tags/v1.0.0', event='push', tamper=False):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d); binary = root / 'bin'; binary.mkdir()
+            # Run the actual publication scripts in an isolated fixture project,
+            # rather than requiring the repository's current version to be 1.0.0.
+            (root / 'tools').mkdir()
+            (root / '.github/scripts').mkdir(parents=True)
+            (root / 'docs/releases').mkdir(parents=True)
+            for script in ('ci_release.py', 'publish_release.py'):
+                shutil.copyfile(ROOT / 'tools' / script, root / 'tools' / script)
+            shutil.copyfile(ROOT / '.github/scripts/publish-apk.sh', root / '.github/scripts/publish-apk.sh')
+            (root / 'version.properties').write_text(FIXTURE_VERSION)
+            (root / 'docs/releases/v1.0.0.md').write_text('# Reviewed fixture release notes\n')
             executable = binary / 'gh'
             executable.write_text('#!' + sys.executable + '\n' + (ROOT / 'tests/ci/fake_gh.py').read_text())
             executable.chmod(0o755)
@@ -120,7 +151,7 @@ class PublicationTests(unittest.TestCase):
             fixture_package(apk, root / 'dist', release.metadata(env))
             if tamper:
                 (root / 'dist' / release.metadata(env)['apk_name']).write_bytes(b'changed')
-            run = subprocess.run(['bash', '.github/scripts/publish-apk.sh'], cwd=ROOT, env=env, text=True, capture_output=True)
+            run = subprocess.run(['bash', '.github/scripts/publish-apk.sh'], cwd=root, env=env, text=True, capture_output=True)
             return run, json.loads(state.read_text()), (root / 'summary').read_text() if (root / 'summary').exists() else ''
 
     def test_first_publish_checks_tag_uploads_then_leaves_draft(self):

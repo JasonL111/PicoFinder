@@ -35,11 +35,25 @@ class LocalizationUiTest {
         Configuration(context.resources.configuration).apply { setLocale(Locale.forLanguageTag(tag)) })
     private fun s(tag: String, @StringRes id: Int, vararg args: Any) = localized(tag).getString(id, *args)
 
+    // API31 has no public per-app LocaleManager. Scope the override to this test
+    // Activity's Resources, including native Dialog windows, and restore it below.
+    @Suppress("DEPRECATION")
+    private fun configureHost(context: Context, configuration: Configuration) {
+        context.resources.updateConfiguration(configuration, context.resources.displayMetrics)
+    }
+
     @Composable private fun WithLocale(tag: String, dark: Boolean = false, scale: Float = 1f, content: @Composable () -> Unit) {
         val base = LocalContext.current
         val configuration = LocalConfiguration.current
-        val translated = remember(base, configuration, tag) { base.createConfigurationContext(
-            Configuration(configuration).apply { setLocale(Locale.forLanguageTag(tag)) }) }
+        val translated = remember(base, configuration, tag, scale) { base.createConfigurationContext(
+            Configuration(configuration).apply { setLocale(Locale.forLanguageTag(tag)); fontScale = scale }) }
+        DisposableEffect(base, tag, scale) {
+            val original = Configuration(configuration)
+            configureHost(base, Configuration(original).apply {
+                setLocale(Locale.forLanguageTag(tag)); fontScale = scale
+            })
+            onDispose { configureHost(base, original) }
+        }
         val density = LocalDensity.current.density
         CompositionLocalProvider(LocalContext provides translated,
             LocalConfiguration provides translated.resources.configuration,
@@ -51,7 +65,7 @@ class LocalizationUiTest {
     private fun device() = DeviceState(1, 1, "legacy fallback", 1000, 1700000000000,
         -42, -43.0, 1.4, null, DeviceStatus.PRESENT, Trend.APPROACHING, DeviceSettings(), -59, 4)
 
-    private fun assertFits(value: String) {
+    private fun assertFits(value: String, dialog: Boolean = false) {
         val layouts = mutableListOf<TextLayoutResult>()
         rule.onNodeWithText(value, useUnmergedTree = true)
             .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
@@ -70,7 +84,7 @@ class LocalizationUiTest {
             if (clipped || !complete) "size=${layout.size}, lines=${layout.lineCount}, complete=$complete" else null
         }
         if (problems.isNotEmpty()) {
-            saveUiScreenshot(rule, "overflow-${value.hashCode()}.png")
+            saveUiScreenshot(rule, "overflow-${value.hashCode()}.png", dialog)
             fail("Text overflow: $value; ${problems.joinToString()}")
         }
     }
@@ -135,11 +149,25 @@ class LocalizationUiTest {
             rule.onNodeWithTag("localized-settings").performScrollToNode(hasText(s(language, id)))
             assertFits(s(language, id))
         }
-        rule.onNodeWithTag("localized-settings").performScrollToNode(hasText(s(language, R.string.forget_device)))
-        rule.onNodeWithText(s(language, R.string.forget_device)).performClick()
+        val forgetLabel = hasText(s(language, R.string.forget_device))
+        val forgetButton = hasClickAction() and (forgetLabel or hasAnyDescendant(forgetLabel))
+        // Scroll the complete touch target into view, including its padding.
+        rule.onNodeWithTag("localized-settings").performScrollToNode(forgetButton)
+        rule.onNode(forgetButton).assertIsDisplayed().performClick()
+        // A platform Dialog has its own window; Compose idleness alone does not
+        // guarantee that WindowManager has made it visible on a software emulator.
+        try {
+            rule.waitUntil(10_000) { rule.onNodeWithText(s(language, R.string.forget_title)).isDisplayed() }
+        } catch (failure: ComposeTimeoutException) {
+            val capture = runCatching { saveUiScreenshot(rule, "dialog-not-visible-$language.png", dialog = true) }
+            val tree = runCatching { rule.onNode(isDialog()).printToString() }.getOrElse { it.message.orEmpty() }
+            throw AssertionError("Dialog not visible: $tree" +
+                "\nCapture: ${capture.exceptionOrNull()}", failure)
+        }
         rule.onNodeWithText(s(language, R.string.forget_title)).assertIsDisplayed()
-        assertFits(s(language, R.string.forget_description))
-        saveUiScreenshot(rule, "v1-$language-dialog.png")
+        assertFits(s(language, R.string.forget_title), dialog = true)
+        assertFits(s(language, R.string.forget_description), dialog = true)
+        saveUiScreenshot(rule, "v1-$language-dialog.png", dialog = true)
         rule.onNodeWithText(s(language, R.string.cancel)).performClick()
     }
 

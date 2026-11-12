@@ -20,7 +20,7 @@ core 唯一改动是将校准错误中文字符串换为 `CalibrationError` 枚�
 | Debug / 未签名 Release / UI test APK | 构建通过 | 1.0.0 / 1000000，真实 APK 版本及签名检查 |
 | lintDebug / lintRelease | 均通过，0 问题 | 无新增 baseline，保留 warningsAsErrors |
 | 临时密钥 Release 签名冒烟 | 通过 | 实际签名脚本 + SDK 校验 v3；测试私钥和已签测试 APK 已删除，不是正式签名交付 |
-| API31 界面 / 本地化 / 原生图标 | 待执行 | 使用无 KVM 软件模拟器，不代表真机 |
+| API31 界面 / 本地化 / 原生图标 | 16 个唯一用例均取得通过结果 | 完整轮次 14/16；修正宿主后本地化 4/4，非单轮 16/16 |
 | 真机 BLE、马达、厂商启动器、正式签名升级 | 未运行 | 环境无物理手机 / Pico，正式密钥由维护者配置 |
 
 执行命令：
@@ -49,10 +49,51 @@ Release lint 另发现两条仅用于模拟截图的文案，已移入 Debug 源
 实际临时签名检查发现 apksigner 在 minSdk31 / v3 包中输出 v2=false、v3=true；
 制品检查现接受有效 v2 或 v3，仍拒绝无现代签名的包，并增加对应回归断言。
 签名冒烟仅使用一次性测试私钥，正式 Secrets 仍未配置；未创建实际 Release。
-最终全量构建 `BUILD SUCCESSFUL in 3m 55s`，日志 `build-final-verified.log`；临时签名构建 44 s。
+输入框标签已缩短，范围放在提示文字中，便于大字体阅读；参数校验和输入项数量不变。
+最终排版调整后的全量构建 `BUILD SUCCESSFUL in 4m 33s`，日志 `build-ui-final.log`；临时签名构建 44 s。
 PR 初次资源修复后的 [Actions run 43172306768](https://github.com/JasonL111/PicoFinder/actions/runs/43172306768)
 实际通过并上传 Debug artifact；最终提交以 PR #3 Checks 为准。
 原始日志、截图和兼容性审计保存在工作环境 `/workspace/artifacts/formal-1.0/`。
+
+API31 首次新增用例轮次为 2 通过 / 3 失败。诊断复现发现 Compose 的段落宽度包含空白：
+按钮实际尺寸 110×20 px，段落却保留 264×20 px；实际截图中 Enable Bluetooth 完整显示。
+测试改为核对每行文字边界、完整字符和省略状态，避免把段落空白误认为裁切；失败时仍保存
+截图及尺寸。没有移除可读性断言。首次日志 `ui-localization.log`、诊断 `ui-diagnostic.log`。
+
+完整回归为 **14 通过 / 2 失败，550.620 s**，原始日志 `ui-full.log`。14 个通过用例含
+真实 Activity + Fake Scanner 的发现、导航、停止、后台、开关保存、版本、系统动画设置，
+既有动画 / 状态 / 大字体 / 顺序回归、SharedPreferences 兼容，以及权限 / 校准错误翻译与
+保留消息切换语言。失败均为新增双语弹窗用例：英文截图未区分主页面和 Dialog 两个 root；
+中文测试只覆盖 Compose 局部上下文，原生 Dialog 宿主仍是英文，诊断树实际显示
+`Remove this saved tag?`，因此无法找到中文标题。增加等待没有解决语言配置错误。
+测试现同时设置宿主 Resources 的语言 / 字体并在退出时恢复，确保 API31 原生窗口也使用
+测试配置；该兼容桥仅在测试代码中使用，未修改生产语言逻辑。另增强完整按钮滚动、原生窗口
+等待和 `isDialog()` 截图选择；保留标题可见、全文字符 / 行边界、取消按钮等断言。
+中间复测及诊断失败日志保留，不计作通过。运行环境中断后模拟器被关闭，最后一次仅完成
+test APK 构建、尚未安装 / 执行的命令也没有计作通过；恢复后以 `ui-native-locale.log` 为准。
+
+恢复后完整重跑 **4 个本地化用例，189.735 s，OK (4 tests)**，包含中文浅色 / 英文深色、
+320 dp / 1.5 倍字体页面与原生弹窗、权限 / 校准错误以及消息 / 名称的语言切换。
+12 个未改动用例沿用完整轮次的通过结果，最终覆盖 16 个不同用例；没有把中间失败算作通过。
+原始完整轮次为 `ui-full.log`，最终本地化轮次为 `ui-native-locale.log`，逐用例来源为
+`ui-validation.json`。最终命令：
+
+```bash
+adb shell am instrument -w -r -e class local.ble.finder.LocalizationUiTest local.ble.finder.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+发布测试使用独立的 1.0.0 夹具，不依赖仓库当前版本。另在临时 1.0.1 工程中实际重跑同一
+18 项发布测试并验证 tag 元数据为 1.0.1 / 1000100，避免正常升级版本号后 CI 被旧测试夹具卡住。
+这不是实际发布 1.0.1，也未创建该 tag。
+
+模拟器使用 API31 AOSP x86_64，无 KVM，320 dp 宽；测试内设置 1.5 倍字体并检查浅 / 深主题。
+冷启动曾出现 System UI / 启动器无响应和图形缓冲区异常，重启本地框架后才执行测试。
+`ro.hw_timeout_multiplier=5` 仅用于该软件环境，不打入 APK；关闭系统动画，专门动画用例
+仍使用可控 Compose 时钟验证过渡。它不能用于真机启动时延、帧率或耗电结论。
+18 个冻结生产 / 协议 / 固件文件与 main 基线逐字节相同；校准类归一化错误文案后主体
+逐字节相同，审计 `compatibility-audit.json`。Manifest 权限集合也保持原样。
+本地最终 Debug APK SHA-256：`e5b2038d2d560f145eadcb846acca36d6146ec6a3867a049d4162f4377b2b4ad`。
+CI 使用临时 Debug 密钥，与本地包签名 / 哈希不同，应以对应 run 的元数据为准。
 
 ### 发布前人工验收
 
