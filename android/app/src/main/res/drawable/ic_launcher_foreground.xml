@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Vector adaptation of the user-supplied artwork; 64 dp outer circle inside the 66 dp safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt" android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:pathData="M54,22 A32,32 0,1 1,54,86 A32,32 0,1 1,54,22">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="25" android:startY="25"
+                android:endX="83" android:endY="83" android:startColor="#E0F2FC" android:endColor="#BEE5F5" />
+        </aapt:attr>
+    </path>
+    <path android:pathData="M54,32.89 A21.11,21.11 0,1 1,54,75.11 A21.11,21.11 0,1 1,54,32.89">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="34" android:startY="34"
+                android:endX="74" android:endY="74" android:startColor="#C6EEF2" android:endColor="#91D7E7" />
+        </aapt:attr>
+    </path>
+    <path android:pathData="M54,46.08 A7.92,7.92 0,1 1,54,61.92 A7.92,7.92 0,1 1,54,46.08">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="47" android:startY="47"
+                android:endX="61" android:endY="61" android:startColor="#62D0D5" android:endColor="#009BC3" />
+        </aapt:attr>
+    </path>
+</vector>

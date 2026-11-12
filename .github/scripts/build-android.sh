@@ -11,7 +11,8 @@ set +e
   '-Dorg.gradle.jvmargs=-Xmx2g -Dfile.encoding=UTF-8' \
   -Pkotlin.compiler.execution.strategy=in-process \
   "-PfinderVersionName=$APK_VERSION_NAME" "-PfinderVersionCode=$APK_VERSION_CODE" \
-  :core:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest \
+  :core:test :app:testDebugUnitTest :app:lintDebug :app:lintRelease \
+  :app:assembleDebug :app:assembleRelease :app:assembleDebugAndroidTest \
   2>&1 | tee "$log_file"
 build_status=${PIPESTATUS[0]}
 set -e

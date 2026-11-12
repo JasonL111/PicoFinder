@@ -4,6 +4,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.annotation.StringRes
+import androidx.test.platform.app.InstrumentationRegistry
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.platform.LocalDensity
@@ -24,10 +27,12 @@ class MotionUiTest {
     private val durationScale = object : MotionDurationScale { override val scaleFactor = 1f }
     @get:Rule val rule = createComposeRule(durationScale)
 
+    private fun s(@StringRes id: Int, vararg args: Any) = InstrumentationRegistry.getInstrumentation().targetContext.getString(id, *args)
+
     private fun device(id: Long = 1, rssi: Int = -62, bars: Int = 3,
         status: DeviceStatus = DeviceStatus.PRESENT, trend: Trend = Trend.STABLE) =
-        DeviceState(id, 1, if (id == 1L) "随身钥匙" else "日常背包", 1000, 1700000000000,
-            rssi, rssi.toDouble(), 1.4, null, status, trend, DeviceSettings(), -59, bars)
+        DeviceState(id, 1, if (id == 1L) "Keys" else "Backpack", 1000, 1700000000000,
+            rssi, rssi.toDouble(), 1.4, null, status, trend, DeviceSettings(name = if (id == 1L) "Keys" else "Backpack"), -59, bars)
 
     @Test fun gradesAndVeryStrongUseConfirmedStateRatherThanRawPeakOrProgress() {
         var current by mutableStateOf(device(rssi = -92, bars = 1))
@@ -35,15 +40,15 @@ class MotionUiTest {
         rule.setContent { PicoFinderTheme { Surface {
             SignalHero(current, scanning = true, veryStrong = confirmed, motionEnabled = false)
         } } }
-        rule.onNodeWithTag("signal-feedback").assertTextEquals("信号较弱")
+        rule.onNodeWithTag("signal-feedback").assertTextEquals(s(R.string.strength_weak))
         rule.runOnIdle { current = device(rssi = -72, bars = 2) }
-        rule.onNodeWithTag("signal-feedback").assertTextEquals("信号中等")
+        rule.onNodeWithTag("signal-feedback").assertTextEquals(s(R.string.strength_medium))
         rule.runOnIdle { current = device(rssi = -40, bars = 4, trend = Trend.APPROACHING) }
-        rule.onNodeWithTag("signal-feedback").assertTextEquals("信号较强")
-        rule.onNodeWithText("信号非常强 · 仔细找找附近").assertDoesNotExist()
+        rule.onNodeWithTag("signal-feedback").assertTextEquals(s(R.string.strength_strong))
+        rule.onNodeWithText(s(R.string.strong_signal_guidance)).assertDoesNotExist()
         rule.runOnIdle { confirmed = true }
-        rule.onNodeWithTag("signal-feedback").assertTextEquals("信号非常强 · 仔细找找附近")
-        rule.onNodeWithText("正在靠近 · 信号变强").assertExists()
+        rule.onNodeWithTag("signal-feedback").assertTextEquals(s(R.string.strong_signal_guidance))
+        rule.onNodeWithText(s(R.string.trend_approaching)).assertExists()
     }
 
     @Test fun lossAndStopMaskEvenStaleStrongPresentation() {
@@ -52,16 +57,16 @@ class MotionUiTest {
         rule.setContent { PicoFinderTheme { Surface {
             SignalHero(current, scanning, veryStrong = true, motionEnabled = false)
         } } }
-        rule.onNodeWithTag("signal-feedback").assertTextEquals("信号非常强 · 仔细找找附近")
+        rule.onNodeWithTag("signal-feedback").assertTextEquals(s(R.string.strong_signal_guidance))
         // Deliberately retain old RSSI/confirmation to exercise the UI's stale-data guard.
         rule.runOnIdle { current = current.copy(deviceStatus = DeviceStatus.LOST) }
-        rule.onNodeWithText("已失联").assertExists()
-        rule.onNodeWithTag("signal-feedback").assertTextEquals("等待信号")
+        rule.onNodeWithText(s(R.string.status_lost)).assertExists()
+        rule.onNodeWithTag("signal-feedback").assertTextEquals(s(R.string.strength_waiting))
         rule.onNodeWithTag("signal-ring").assert(SemanticsMatcher.expectValue(
             SemanticsProperties.ProgressBarRangeInfo, ProgressBarRangeInfo(0f, 0f..1f)))
         rule.runOnIdle { current = device(rssi = -40, bars = 4); scanning = false }
-        rule.onNodeWithTag("signal-feedback").assertTextEquals("等待信号")
-        rule.onNodeWithText("等待新的有效广播").assertExists()
+        rule.onNodeWithTag("signal-feedback").assertTextEquals(s(R.string.strength_waiting))
+        rule.onNodeWithText(s(R.string.trend_waiting)).assertExists()
     }
 
     @Test fun finiteProgressInterpolatesAndReducedMotionSnaps() {
@@ -71,19 +76,19 @@ class MotionUiTest {
         lateinit var display: State<Float>
         rule.setContent {
             display = animateSignalProgress(target, allowed)
-            Text("测量值始终是 -62.0 dBm")
+            Text("Measurement stays at -62.0 dBm")
         }
         rule.mainClock.advanceTimeByFrame()
         rule.runOnIdle { target = 0.9f }
         rule.mainClock.advanceTimeByFrame()
         rule.mainClock.advanceTimeBy(225)
         rule.runOnIdle { assertTrue(display.value > 0.2f && display.value < 0.9f) }
-        rule.onNodeWithText("测量值始终是 -62.0 dBm").assertExists()
+        rule.onNodeWithText("Measurement stays at -62.0 dBm").assertExists()
         rule.mainClock.advanceTimeBy(600)
         rule.runOnIdle { assertEquals(0.9f, display.value, 0.001f); target = 0.35f; allowed = false }
         rule.mainClock.advanceTimeByFrame()
         rule.runOnIdle { assertEquals(0.35f, display.value, 0f) }
-        rule.onNodeWithText("测量值始终是 -62.0 dBm").assertExists()
+        rule.onNodeWithText("Measurement stays at -62.0 dBm").assertExists()
     }
 
     @Test fun animatedScreenKeepsOriginalRssiAndCalibrationValues() {
@@ -111,7 +116,7 @@ class MotionUiTest {
                 PicoFinderTheme {
                     Surface(Modifier.width(320.dp).fillMaxHeight()) {
                         DeviceListPage(FinderUiState(devices = devices, scanning = true, demo = true,
-                            message = "受控模拟数据"), motionEnabled = false, onSelect = {}, onStart = {},
+                            message = text(R.string.simulated_data)), motionEnabled = false, onSelect = {}, onStart = {},
                             onStop = {}, onDemo = {}, onBluetooth = {}, onLocation = {}, onPermissions = {})
                     }
                 }
@@ -125,8 +130,8 @@ class MotionUiTest {
         rule.runOnIdle { devices = listOf(device(1, -40, 4), device(2, -90, 1, status = DeviceStatus.WEAK)) }
         assertEquals(first.top, rule.onNodeWithTag("device-1").fetchSemanticsNode().boundsInRoot.top, 0.5f)
         assertEquals(second.top, rule.onNodeWithTag("device-2").fetchSemanticsNode().boundsInRoot.top, 0.5f)
-        rule.onNodeWithText("随身钥匙").assertExists()
-        rule.onNodeWithText("日常背包").assertExists()
+        rule.onNodeWithText("Keys").assertExists()
+        rule.onNodeWithText("Backpack").assertExists()
     }
 
     @Test fun lightDarkAndLargeTypeRemainReadableWithStaticMotion() {
@@ -138,7 +143,7 @@ class MotionUiTest {
             CompositionLocalProvider(LocalDensity provides Density(density, scale)) {
                 PicoFinderTheme(dark) { Surface {
                     Column {
-                        Text("PicoFinder V1.2 · 受控模拟数据", modifier = Modifier.padding(16.dp))
+                        Text(stringResource(R.string.demo_screenshot_caption, BuildConfig.VERSION_NAME), modifier = Modifier.padding(16.dp))
                         Box(Modifier.weight(1f)) {
                             FindDevice(current, FinderUiState(devices = listOf(current), scanning = true,
                                 demo = true, veryStrongSignal = true),
@@ -151,12 +156,12 @@ class MotionUiTest {
         rule.onNodeWithTag("signal-ring").assertIsDisplayed()
         saveUiScreenshot(rule, "v12-find-light.png")
         rule.runOnIdle { dark = true }
-        rule.onNodeWithTag("signal-feedback").assertTextEquals("信号非常强 · 仔细找找附近")
+        rule.onNodeWithTag("signal-feedback").assertTextEquals(s(R.string.strong_signal_guidance))
         saveUiScreenshot(rule, "v12-find-dark.png")
         rule.runOnIdle { scale = 1.8f }
         rule.onNodeWithTag("signal-ring").assertIsDisplayed()
         saveUiScreenshot(rule, "v12-find-large-type.png")
-        rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("设备设置与 1 米校准"))
-        rule.onNodeWithText("设备设置与 1 米校准").assertIsDisplayed()
+        rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText(s(R.string.open_device_settings)))
+        rule.onNodeWithText(s(R.string.open_device_settings)).assertIsDisplayed()
     }
 }

@@ -10,7 +10,7 @@ import java.io.File
 
 /** Saves actual rendered pixels. Test fixtures are explicitly labelled as simulated data. */
 internal fun saveUiScreenshot(rule: ComposeTestRule, name: String) {
-    val dir = InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir("v12-screens")!!
+    val dir = InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir("formal-screens")!!
     check(dir.exists() || dir.mkdirs())
     File(dir, name).outputStream().use {
         check(rule.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it))
