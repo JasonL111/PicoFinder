@@ -151,8 +151,6 @@
     <string name="calibration_unstable">The signal varied too much. Keep the phone and tag still, then retry.</string>
     <string name="calibration_not_enough_stable">Not enough stable samples. Try again.</string>
     <string name="calibration_reference_invalid">Reference RSSI is outside the valid range.</string>
-    <string name="simulated_data">Controlled simulated data</string>
-    <string name="demo_screenshot_caption">PicoFinder %1$s · Controlled simulated data</string>
     <plurals name="device_count">
         <item quantity="one">%1$d tag</item>
         <item quantity="other">%1$d tags</item>

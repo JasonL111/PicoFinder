@@ -145,8 +145,6 @@
     <string name="calibration_unstable">信号波动过大，请固定手机与标签并重试</string>
     <string name="calibration_not_enough_stable">稳定样本不足，请重试</string>
     <string name="calibration_reference_invalid">参考 RSSI 超出有效范围</string>
-    <string name="simulated_data">受控模拟数据</string>
-    <string name="demo_screenshot_caption">PicoFinder %1$s · 受控模拟数据</string>
     <plurals name="device_count">
         <item quantity="other">%1$d 个</item>
     </plurals>
