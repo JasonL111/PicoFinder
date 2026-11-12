@@ -1,8 +1,8 @@
 # 下载、安装与版本核对
 
 正式下载入口为 [Releases](https://github.com/JasonL111/PicoFinder/releases)。
-**1.0.0 当前已完成发布准备，尚未发布**：维护者需要配置固定签名 Secrets，合并准备工作，
-再推送 `v1.0.0`。旧 `dev-latest` 保留为历史开发产物，不代表本次正式版本。
+从 **1.0.0** 开始，正式 APK 仅在固定密钥签名的版本 tag 工作流成功后上传。
+维护者发布步骤见 [releasing.md](releasing.md)。旧 `dev-latest` 保留为历史开发产物，不代表当前正式版本。
 
 ## 普通用户
 

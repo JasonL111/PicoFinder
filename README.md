@@ -12,9 +12,9 @@ A local Bluetooth Low Energy item finder: a USB-powered Raspberry Pi Pico 2 W br
 tag ID, and an Android phone shows relative signal strength to help you search nearby.
 Useful for finding keys or a bag around a home; it is not precise indoor positioning or a remote tracking network.
 
-**Version 1.0.0 is prepared for its first signed release.** Publication requires the maintainer
-signing Secrets and a `v1.0.0` tag. Until then, Actions provides Debug previews; the old
-`dev-latest` entry is historical development output, not the formal 1.0.0 download.
+**Current version: 1.0.0.** Formal APKs are published from version tags using a long-lived
+maintainer signing key. Actions provides Debug previews; the old `dev-latest` entry is historical
+development output. Check the versioned release assets for the formal download.
 
 ## Download
 

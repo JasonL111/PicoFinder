@@ -1,7 +1,7 @@
 # Versioned releases
 
-The first formal version is **1.0.0 / 1000000**, tag **v1.0.0**. This change prepares publication;
-the maintainer has not configured signing Secrets yet, so no formal tag or release is created by this task.
+The first formal version is **1.0.0 / 1000000**, tag **v1.0.0**. Publication requires the Android
+signing Secrets below and a matching version tag; published versions are listed in GitHub Releases.
 The previous `dev-latest` remains historical output. New pushes never move it or replace its assets.
 
 ## One-time signing setup
@@ -74,8 +74,6 @@ The resulting [v1.0.0 page](https://github.com/JasonL111/PicoFinder/releases/tag
 
 Download/install that exact public asset on a phone and compare checksums and visible version.
 Existing Debug installs may require uninstalling because their signing key differs; see [delivery.md](delivery.md).
-After the first successful publication, update the preparation notices in the READMEs, delivery guide,
-changelog and this document in a follow-up documentation commit. Keep the published tag unchanged.
 
 ## Future versions and reruns
 
